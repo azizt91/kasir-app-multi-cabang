@@ -1,41 +1,29 @@
-# Kasir App - Aplikasi Kasir Berbasis Web
+# Kasir App - Aplikasi Kasir Berbasis Web (Multi-Cabang & Multi-Gudang)
 
-Kasir App adalah aplikasi Point of Sale (POS) berbasis web yang modern dan ramah pengguna, dirancang untuk membantu mengelola transaksi penjualan, produk, dan stok dengan efisien.
+Kasir App adalah aplikasi Point of Sale (POS) berbasis web yang modern dan ramah pengguna, kini ditingkatkan dengan arsitektur **Multi-Cabang** dan **Multi-Gudang**. Dirancang untuk membantu mengelola transaksi penjualan, produk, dan stok di berbagai lokasi sekaligus dengan efisien.
 
 ## Fitur Utama
 
-- **Sistem Kasir (POS):** Antarmuka kasir yang cepat dan mudah digunakan
-- **Manajemen Produk & Kategori:** Kelola produk dengan mudah
-- **Produk Varian:** Dukungan untuk produk dengan varian (Warna/Ukuran) dengan harga dan stok berbeda
-- **Multi Metode Pembayaran:** Tunai, Utang, Kartu, E-Wallet, Transfer
-- **Manajemen Piutang:** Pencatatan nama customer dan tandai lunas
-- **Laporan:** Penjualan, stok, produk, dan piutang
-- **Cetak Struk & Barcode:** Cetak struk transaksi dan label barcode
-- **Multi User:** Admin dan Kasir dengan hak akses berbeda
-- **Manajemen Supplier:** Kelola data supplier dan kontak
-- **Manajemen Pelanggan:** Database pelanggan untuk layanan personal
-- **Pembelian Stok (Restok):** Catat pembelian barang masuk dan update stok otomatis
-- **Biaya Operasional:** Catat pengeluaran toko (listrik, gaji, dll)
-- **Riwayat Transaksi:** Lihat dan kelola histori penjualan (termasuk fitur Void/Batal)
-- **Support Printer:** Cetak struk via USB (WebUSB), Bluetooth, dan Browser Dialog
-- **Pengaturan Toko:** Nama toko, alamat, logo, dan lainnya
+- **Multi-Cabang (Multi-Branch):** Kelola banyak outlet/cabang dalam satu sistem.
+- **Multi-Gudang (Multi-Warehouse):** Kelola stok di berbagai lokasi gudang per cabang.
+- **Transfer Stok Internal:** Pindahkan stok antar gudang dengan pencatatan mutasi yang akurat.
+- **Sistem Kasir (POS):** Antarmuka kasir cepat yang terisolasi per cabang (Kasir hanya melihat stok cabangnya sendiri).
+- **Manajemen Produk & Kategori:** Kelola produk tunggal maupun varian.
+- **Produk Varian:** Dukungan untuk produk dengan varian (Warna/Ukuran) dengan harga dan stok berbeda di tiap gudang.
+- **Multi Metode Pembayaran:** Tunai, Utang, Kartu, E-Wallet, Transfer.
+- **Manajemen Piutang:** Pencatatan nama customer dan pelacakan status pembayaran.
+- **Laporan Komprehensif:** Laporan penjualan, stok, produk, dan keuangan yang bisa difilter per cabang.
+- **Cetak Struk & Barcode:** Dukungan Thermal Printer (USB, Bluetooth, Browser) dan cetak label barcode.
+- **Hak Akses User:** Role Superadmin (Global), Admin Cabang, dan Kasir dengan izin akses spesifik.
+- **Manajemen Operasional:** Kelola Pembelian (Restok) ke gudang tertentu dan catat Biaya Operasional per cabang.
 
-## Panduan Printer USB
+## Panduan Printer
 
-Aplikasi ini mendukung pencetakan struk menggunakan Printer Thermal USB (ESC/POS) secara langsung dari browser menggunakan teknologi **WebUSB**.
+Aplikasi ini mendukung pencetakan struk menggunakan Printer Thermal USB (WebUSB), Bluetooth, dan Browser Dialog.
 
-**Persyaratan:**
-1.  **Browser:** Gunakan Google Chrome, Microsoft Edge, atau Opera (Chromium-based).
-2.  **Koneksi:** Pastikan printer USB terhubung dan menyala.
-3.  **HTTPS:** Fitur WebUSB *hanya* berfungsi pada protokol **https://** atau **http://localhost**. Jika di-hosting di server publik (non-localhost), wajib menggunakan SSL/HTTPS.
-
-**Cara Menggunakan:**
-1.  Masuk ke menu **Pengaturan (Settings)**.
-2.  Gulir ke bagian **Printer Struk**.
-3.  Klik tombol **Connect USB Printer**.
-4.  Pilih printer thermal Anda dari daftar popup browser, lalu klik **Connect**.
-5.  Status akan berubah menjadi "Terhubung".
-6.  Gunakan tombol **Test Print USB** untuk mencoba mencetak.
+**Persyaratan WebUSB:**
+1.  **Browser:** Google Chrome, Microsoft Edge, atau Opera.
+2.  **HTTPS:** Wajib menggunakan protokol **https://** atau **http://localhost**.
 
 ## Teknologi
 
@@ -52,85 +40,59 @@ Aplikasi ini mendukung pencetakan struk menggunakan Printer Thermal USB (ESC/POS
 
 ## Instalasi
 
-### 1. Extract File
+### 1. Extract Project
 
-Extract file `kasir-app.zip` ke folder htdocs (XAMPP) atau www (Laragon):
-
-```
-C:\xampp\htdocs\kasir-app\
-```
+Extract file project ke folder server Anda (misal: `C:\xampp\htdocs\kasir-app-multi-cabang\`).
 
 ### 2. Install Dependencies
 
-Buka terminal/command prompt, masuk ke folder project:
-
 ```bash
-cd C:\xampp\htdocs\kasir-app
 composer install
 npm install
 ```
 
 ### 3. Konfigurasi Environment
 
-Salin file `.env.example` menjadi `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Edit file `.env` dan sesuaikan konfigurasi database:
+Salin `.env.example` menjadi `.env` dan sesuaikan konfigurasi database:
 
 ```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
 DB_DATABASE=kasir_db
 DB_USERNAME=root
 DB_PASSWORD=
 ```
 
-### 4. Generate App Key
+### 4. Setup Database & Assets
 
 ```bash
 php artisan key:generate
-```
-
-### 5. Migrasi Database
-
-Buat database baru di phpMyAdmin dengan nama `kasir_db`, lalu jalankan:
-
-```bash
 php artisan migrate --seed
-```
-
-### 6. Build Assets
-
-```bash
 npm run build
 ```
 
-### 7. Jalankan Aplikasi
+### 5. Jalankan Aplikasi
 
 ```bash
 php artisan serve
 ```
 
-Buka browser dan akses: `http://127.0.0.1:8000`
+Akses via browser: `http://127.0.0.1:8000`
 
 ## Akun Demo
 
-| Role  | Email                    | Password |
-|-------|--------------------------|----------|
-| Admin | admin@minimarket.com     | password |
-| Kasir | kasir1@minimarket.com    | password |
-| Kasir | kasir2@minimarket.com    | password |
+Sistem menggunakan data awal berbasis skenario untuk pengujian multi-cabang:
 
-## Catatan Penting
+| Role | Nama | Email | Branch | Password |
+|------|------|-------|--------|----------|
+| **Superadmin** | Superadmin | `admin@minimarket.com` | Global (All) | `password` |
+| **Admin** | Admin Pusat | `admin.pusat@minimarket.com` | Cabang Utama | `password` |
+| **Kasir** | Kasir Pusat | `kasir1@minimarket.com` | Cabang Utama | `password` |
+| **Kasir** | Kasir Bandung | `kasir2@minimarket.com` | Cabang Bandung | `password` |
 
-- Pastikan XAMPP/Laragon sudah running (Apache & MySQL)
-- Jika menggunakan XAMPP, bisa langsung akses via `http://localhost/kasir-app/public`
-- Untuk production, arahkan document root ke folder `public/`
+## Catatan Arsitektur
+
+- **Stok:** Stok tidak lagi disimpan di tabel `products`, melainkan di tabel pivot `product_warehouse` untuk mendukung multi-lokasi.
+- **Scope:** Data transaksi dan keuangan difilter secara otomatis berdasarkan cabang user yang sedang login (kecuali Superadmin).
 
 ---
 
-© 2025 Kasir App
+© 2025 Kasir App - Multi-Branch Edition
