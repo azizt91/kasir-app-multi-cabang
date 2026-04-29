@@ -1,0 +1,2 @@
+[19-Feb-2026 03:08:10 UTC] PHP Fatal error:  Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.3.0". You are running 8.2.30. in /home/apikcorp/pos.apikcorporation.my.id/vendor/composer/platform_check.php on line 26
+[19-Feb-2026 03:08:17 UTC] PHP Fatal error:  Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.3.0". You are running 8.2.30. in /home/apikcorp/pos.apikcorporation.my.id/vendor/composer/platform_check.php on line 26
