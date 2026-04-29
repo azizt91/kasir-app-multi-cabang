@@ -38,8 +38,11 @@ class CashFlowSeeder extends Seeder
                 $amount = $faker->randomElement([100000, 250000, 500000, 1000000]);
             }
 
+            $user = $users->random();
+
             CashFlow::create([
-                'user_id' => $users->random()->id,
+                'user_id' => $user->id,
+                'branch_id' => $user->branch_id,
                 'date' => Carbon::now()->subDays(random_int(0, 30))->format('Y-m-d'),
                 'type' => $type,
                 'category' => $category,

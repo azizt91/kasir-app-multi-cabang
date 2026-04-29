@@ -71,14 +71,28 @@
                                 @error('name')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                             </div>
 
-                            {{-- Kategori --}}
-                            <div>
-                                <label for="category_id" class="block text-sm font-medium text-gray-700 mb-1">Kategori <span class="text-red-500">*</span></label>
-                                <select name="category_id" id="category_id" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
-                                    <option value="">Pilih kategori</option>
-                                    @foreach($categories as $category)<option value="{{ $category->id }}" @selected(old('category_id', $product->category_id) == $category->id)>{{ $category->name }}</option>@endforeach
-                                </select>
-                                @error('category_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {{-- Kategori --}}
+                                <div>
+                                    <label for="category_id" class="block text-sm font-medium text-gray-700 mb-1">Kategori <span class="text-red-500">*</span></label>
+                                    <select name="category_id" id="category_id" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                                        <option value="">Pilih kategori</option>
+                                        @foreach($categories as $category)<option value="{{ $category->id }}" @selected(old('category_id', $product->category_id) == $category->id)>{{ $category->name }}</option>@endforeach
+                                    </select>
+                                    @error('category_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                                </div>
+
+                                {{-- Gudang untuk Edit Stok --}}
+                                <div>
+                                    <label for="warehouse_id" class="block text-sm font-medium text-gray-700 mb-1">Pilih Gudang (Untuk Update Stok) <span class="text-red-500">*</span></label>
+                                    <select name="warehouse_id" id="warehouse_id" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required @change="updateStockDisplay($event.target.value)">
+                                        <option value="">Pilih Gudang</option>
+                                        @foreach($warehouses as $wh)
+                                            <option value="{{ $wh->id }}" @selected(old('warehouse_id') == $wh->id || (auth()->user()->getActiveWarehouse() && auth()->user()->getActiveWarehouse()->id == $wh->id))>{{ $wh->name }} ({{ $wh->branch->name ?? '-' }})</option>
+                                        @endforeach
+                                    </select>
+                                    @error('warehouse_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                                </div>
                             </div>
 
                              {{-- Deskripsi --}}
@@ -238,6 +252,13 @@
                     this.deletedVariantIds.push(variant.id);
                 }
                 this.variants.splice(index, 1);
+            },
+
+            updateStockDisplay(warehouseId) {
+                // For a fully dynamic UI, we'd fetch stocks via AJAX.
+                // For now, reloading the page or handling server-side validation is easier,
+                // but we can just let the user know they are editing stock for the selected warehouse.
+                console.log('Selected warehouse:', warehouseId);
             }
         }
     }

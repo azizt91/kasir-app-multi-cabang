@@ -63,6 +63,17 @@
                                     @error('category_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                                 </div>
                                 
+                                <div>
+                                    <label for="warehouse_id" class="block text-sm font-medium text-gray-700 mb-1">Gudang (Stok Awal) <span class="text-red-500">*</span></label>
+                                    <select name="warehouse_id" id="warehouse_id" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                                        <option value="">Pilih gudang</option>
+                                        @foreach($warehouses as $wh)
+                                            <option value="{{ $wh->id }}" @selected(old('warehouse_id') == $wh->id)>{{ $wh->name }} ({{ $wh->branch->name ?? '-' }})</option>
+                                        @endforeach
+                                    </select>
+                                    @error('warehouse_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                                </div>
+                                
                                 {{-- Product Type Toggle --}}
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Tipe Produk</label>

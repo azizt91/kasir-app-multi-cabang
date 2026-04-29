@@ -49,7 +49,7 @@ class ReportController extends BaseController
             'year_sales' => Transaction::where('status', 'completed')->where('payment_method', '!=', 'utang')->where('created_at', '>=', $thisYear)->sum('total_amount'),
             'year_transactions' => Transaction::where('status', 'completed')->where('created_at', '>=', $thisYear)->count(),
             'total_products' => Product::count(),
-            'low_stock_products' => Product::whereRaw('stock <= minimum_stock')->count(),
+            'low_stock_products' => Product::lowStock()->count(),
             'total_categories' => Category::count(),
             'total_users' => User::count(),
         ];
@@ -89,10 +89,10 @@ class ReportController extends BaseController
 
         // Low stock products
         $lowStockProducts = Product::with('category')
-            ->whereRaw('stock <= minimum_stock')
-            ->orderBy('stock', 'asc')
+            ->lowStock()
             ->take(10)
             ->get();
+        $lowStockProducts->each(function ($p) { $p->total_stock = $p->getTotalStock(); });
 
         // Calculate real-time cash balance (Saldo Kas Saat Ini)
         $currentBalance = DB::table(DB::raw("(
@@ -202,16 +202,21 @@ class ReportController extends BaseController
         $products = $query->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
 
+        // Append total stock from product_warehouse
+        $products->each(function ($product) {
+            $product->total_stock = $product->getTotalStock();
+        });
+
         $summary = [
             'total_products' => $products->count(),
             'total_stock_value' => $products->sum(function($product) {
-                return $product->stock * $product->purchase_price;
+                return $product->total_stock * $product->purchase_price;
             }),
             'total_selling_value' => $products->sum(function($product) {
-                return $product->stock * $product->selling_price;
+                return $product->total_stock * $product->selling_price;
             }),
             'low_stock_count' => $products->filter(function($product) {
-                return $product->stock <= $product->minimum_stock;
+                return $product->total_stock <= $product->minimum_stock;
             })->count(),
         ];
 
@@ -237,25 +242,25 @@ class ReportController extends BaseController
 
         $query = Product::with('category');
 
+        $stockSubquery = '(SELECT COALESCE(SUM(pw.stock), 0) FROM product_warehouse pw WHERE pw.product_id = products.id)';
         switch ($status) {
             case 'low':
-                $query->whereRaw('stock <= minimum_stock AND stock > 0');
+                $query->whereRaw("$stockSubquery <= products.minimum_stock AND $stockSubquery > 0");
                 break;
             case 'out':
-                $query->where('stock', 0);
+                $query->whereRaw("$stockSubquery = 0");
                 break;
             default:
-                // all products
                 break;
         }
 
-        $products = $query->orderBy('stock', 'asc')->get();
+        $products = $query->selectRaw("products.*, $stockSubquery as total_stock")->orderBy('total_stock', 'asc')->get();
 
         $summary = [
             'total_products' => Product::count(),
-            'low_stock_products' => Product::whereRaw('stock <= minimum_stock AND stock > 0')->count(),
-            'out_of_stock_products' => Product::where('stock', 0)->count(),
-            'normal_stock_products' => Product::whereRaw('stock > minimum_stock')->count(),
+            'low_stock_products' => Product::whereRaw("$stockSubquery <= products.minimum_stock AND $stockSubquery > 0")->count(),
+            'out_of_stock_products' => Product::whereRaw("$stockSubquery = 0")->count(),
+            'normal_stock_products' => Product::whereRaw("$stockSubquery > products.minimum_stock")->count(),
         ];
 
         if ($format === 'pdf') {

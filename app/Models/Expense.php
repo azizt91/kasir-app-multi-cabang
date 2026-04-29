@@ -13,10 +13,19 @@ class Expense extends Model
         'amount',
         'date',
         'user_id',
+        'branch_id',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the branch for the expense.
+     */
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

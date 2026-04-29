@@ -7,18 +7,16 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    /**
-     * Display the dashboard.
-     */
     public function index(Request $request)
     {
         $user = $request->user();
         
         // Get basic statistics (only completed transactions)
+        // BranchScope auto-filters for kasir
         $stats = [
             'total_products' => Product::count(),
             'low_stock_products' => Product::lowStock()->count(),
@@ -27,7 +25,7 @@ class DashboardController extends Controller
         ];
 
         // Get recent transactions (last 10)
-        $recent_transactions = Transaction::with(['user', 'items.product'])
+        $recent_transactions = Transaction::with(['user', 'items.product', 'branch'])
             ->latest()
             ->take(10)
             ->get();
@@ -37,6 +35,11 @@ class DashboardController extends Controller
             ->lowStock()
             ->take(10)
             ->get();
+
+        // Append total stock for display
+        $low_stock_products->each(function ($product) {
+            $product->total_stock = $product->getTotalStock();
+        });
 
         // Get top selling products (this week) — only from completed transactions
         $top_products = Product::withSum(['transactionItems as total_sold' => function ($query) {
@@ -78,6 +81,9 @@ class DashboardController extends Controller
                 ];
             });
 
+        // Branch info for display
+        $branch = $user->branch;
+
         return view('dashboard', [
             'stats' => $stats,
             'recent_transactions' => $recent_transactions,
@@ -87,6 +93,7 @@ class DashboardController extends Controller
             'daily_sales' => $daily_sales,
             'category_distribution' => $category_distribution,
             'user_role' => $user->role,
+            'branch' => $branch,
         ]);
     }
 }

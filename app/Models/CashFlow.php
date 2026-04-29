@@ -17,6 +17,7 @@ class CashFlow extends Model
         'amount',
         'note',
         'user_id',
+        'branch_id',
     ];
 
     protected $casts = [
@@ -30,5 +31,13 @@ class CashFlow extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the branch for the cash flow.
+     */
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

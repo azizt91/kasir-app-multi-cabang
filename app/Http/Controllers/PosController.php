@@ -7,12 +7,29 @@ use App\Models\Category;
 use App\Models\StockMovement;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class PosController extends Controller
 {
+    /**
+     * Get the active warehouse for the current user.
+     * Throws exception if no warehouse is found.
+     */
+    private function getActiveWarehouse(): Warehouse
+    {
+        $user = auth()->user();
+        $warehouse = $user->getActiveWarehouse();
+
+        if (!$warehouse) {
+            abort(403, 'Tidak ada gudang aktif yang terhubung ke cabang Anda. Hubungi admin.');
+        }
+
+        return $warehouse;
+    }
+
     /**
      * Display the POS interface.
      */
@@ -21,54 +38,18 @@ class PosController extends Controller
         $categories = Category::all();
         $customers = \App\Models\Customer::orderBy('name')->get();
         $storeSettings = \App\Models\Setting::getStoreSettings(); // Tambahkan ini
-        return view('pos.index', compact('categories', 'customers', 'storeSettings'));
+
+        $user = auth()->user();
+        $warehouse = $user->getActiveWarehouse();
+        $branch = $user->branch;
+
+        return view('pos.index', compact('categories', 'customers', 'storeSettings', 'warehouse', 'branch'));
     }
 
     /**
      * Search products for POS.
+     * Stock is fetched from product_warehouse for the user's active warehouse.
      */
-    // public function searchProducts(Request $request)
-    // {
-    //     $query = $request->get('q');
-    //     $category = $request->get('category');
-    //     $page = $request->get('page', 1);
-    //     $perPage = $request->get('per_page', 10);
-
-    //     $productsQuery = Product::with('category')
-    //         ->where('stock', '>', 0);
-
-    //     // Filter by category if specified
-    //     if ($category && $category !== 'all') {
-    //         $productsQuery->whereHas('category', function($q) use ($category) {
-    //             $q->where('id', $category);
-    //         });
-    //     }
-
-    //     // Filter by search query if specified
-    //     if (!empty($query) && strlen($query) >= 2) {
-    //         $productsQuery->where(function ($q) use ($query) {
-    //             $q->where('name', 'like', "%{$query}%")
-    //               ->orWhere('barcode', 'like', "%{$query}%");
-    //         });
-    //     }
-
-    //     // Paginate results
-    //     $products = $productsQuery
-    //         ->skip(($page - 1) * $perPage)
-    //         ->take($perPage)
-    //         ->get(['id', 'name', 'barcode', 'selling_price', 'stock', 'category_id', 'image']);
-
-    //     $total = $productsQuery->count();
-
-    //     return response()->json([
-    //         'products' => $products,
-    //         'total' => $total,
-    //         'current_page' => $page,
-    //         'per_page' => $perPage,
-    //         'last_page' => ceil($total / $perPage)
-    //     ]);
-    // }
-
     public function searchProducts(Request $request)
     {
         // Mengambil parameter dari request
@@ -76,8 +57,16 @@ class PosController extends Controller
         $category = $request->get('category');
         $perPage = $request->get('per_page', 10);
 
+        $warehouse = $this->getActiveWarehouse();
+        $warehouseId = $warehouse->id;
+
         // Membangun query dasar ke ProductGroup
-        $groupsQuery = \App\Models\ProductGroup::with('products');
+        $groupsQuery = \App\Models\ProductGroup::with(['products' => function($q) use ($warehouseId) {
+            // Eager load warehouse stock for this specific warehouse
+            $q->with(['warehouses' => function($wq) use ($warehouseId) {
+                $wq->where('warehouses.id', $warehouseId);
+            }]);
+        }]);
 
         // Filter berdasarkan kategori
         if ($category && $category !== 'all') {
@@ -99,12 +88,17 @@ class PosController extends Controller
         $groups = $groupsQuery->latest()->paginate($perPage);
 
         // Transform collection untuk format yang sesuai dengan Frontend POS
-        $groups->getCollection()->transform(function ($group) {
+        $groups->getCollection()->transform(function ($group) use ($warehouseId) {
             if ($group->has_variants) {
                 // Logic untuk Produk Varian
                 $minPrice = $group->products->min('selling_price');
                 $maxPrice = $group->products->max('selling_price');
-                $totalStock = $group->products->sum('stock');
+                
+                // Calculate total stock from product_warehouse
+                $totalStock = $group->products->sum(function($product) use ($warehouseId) {
+                    return $product->getStockInWarehouse($warehouseId);
+                });
+                
                 $firstProduct = $group->products->first(); // Ambil satu untuk gambar
 
                 return [
@@ -112,17 +106,16 @@ class PosController extends Controller
                     'name' => $group->name,
                     'is_group' => true,
                     'image' => $firstProduct ? $firstProduct->image : null,
-                    'price_display' => ($minPrice == $maxPrice) ? $minPrice : "$minPrice - $maxPrice", // Raw numbers for formatter later or pre-format? Let's use raw for consistency if possible, or pre-formatted string. 
-                    // Frontend 'formatRupiah' expects number. Let's send min price as 'selling_price' for sorting/display base.
+                    'price_display' => ($minPrice == $maxPrice) ? $minPrice : "$minPrice - $maxPrice",
                     'selling_price' => $minPrice, 
                     'stock' => $totalStock,
-                    'variants' => $group->products->map(function($v) {
+                    'variants' => $group->products->map(function($v) use ($warehouseId) {
                         return [
                             'id' => $v->id,
                             'name' => $v->variant_name, // Just variant name "XL"
                             'full_name' => $v->name, // "Kaos (XL)"
                             'price' => $v->selling_price,
-                            'stock' => $v->stock,
+                            'stock' => $v->getStockInWarehouse($warehouseId),
                             'image' => $v->image
                         ];
                     })
@@ -138,14 +131,11 @@ class PosController extends Controller
                     'is_group' => false,
                     'image' => $product->image,
                     'selling_price' => $product->selling_price,
-                    'stock' => $product->stock,
+                    'stock' => $product->getStockInWarehouse($warehouseId),
                     'variants' => []
                 ];
             }
         });
-
-        // Filter out nulls (if any empty groups)
-        // $groups->setCollection($groups->getCollection()->filter());
 
         return response()->json($groups);
     }
@@ -167,31 +157,40 @@ class PosController extends Controller
             return response()->json([]);
         }
 
+        $warehouse = $this->getActiveWarehouse();
+        $warehouseId = $warehouse->id;
+
         $products = Product::with('category')
             ->where(function ($q) use ($query) {
                 $q->where('barcode', $query)
                   ->orWhere('name', 'like', "%{$query}%");
             })
-            ->where('stock', '>', 0)
-            ->take(10)
             ->get()
-            ->map(function ($product) {
+            ->filter(function ($product) use ($warehouseId) {
+                // Only include products that have stock in the active warehouse
+                return $product->getStockInWarehouse($warehouseId) > 0;
+            })
+            ->take(10)
+            ->map(function ($product) use ($warehouseId) {
+                $warehouseStock = $product->getStockInWarehouse($warehouseId);
                 return [
                     'id' => $product->id,
                     'barcode' => $product->barcode,
                     'name' => $product->name,
                     'category' => $product->category->name,
                     'selling_price' => (float) $product->selling_price,
-                    'stock' => $product->stock,
-                    'is_low_stock' => $product->is_low_stock,
+                    'stock' => $warehouseStock,
+                    'is_low_stock' => $warehouseStock <= $product->minimum_stock,
                 ];
-            });
+            })
+            ->values();
 
         return response()->json($products);
     }
 
     /**
      * Process transaction.
+     * Stock is deducted from the user's active warehouse (product_warehouse table).
      */
     public function store(Request $request)
     {
@@ -210,6 +209,11 @@ class PosController extends Controller
         try {
             DB::beginTransaction();
 
+            $user = auth()->user();
+            $warehouse = $this->getActiveWarehouse();
+            $warehouseId = $warehouse->id;
+            $branchId = $user->branch_id;
+
             $subtotal = 0;
             $items = [];
 
@@ -217,9 +221,16 @@ class PosController extends Controller
             foreach ($request->items as $item) {
                 $product = Product::findOrFail($item['product_id']);
 
-                // Check stock availability
-                if ($product->stock < $item['quantity']) {
-                    throw new \Exception("Stok {$product->name} tidak mencukupi. Stok tersedia: {$product->stock}");
+                // STRICT VALIDATION: Check stock in the specific warehouse
+                $warehouseStock = $product->getStockInWarehouse($warehouseId);
+                if ($warehouseStock < $item['quantity']) {
+                    $globalStock = $product->getTotalStock();
+                    $errorMsg = "Stok {$product->name} di gudang \"{$warehouse->name}\" tidak mencukupi. " .
+                                "Stok gudang ini: {$warehouseStock}";
+                    if ($globalStock > $warehouseStock) {
+                        $errorMsg .= " (Stok global: {$globalStock}). Lakukan transfer stok dari gudang lain terlebih dahulu.";
+                    }
+                    throw new \Exception($errorMsg);
                 }
 
                 $itemSubtotal = (float) $product->selling_price * $item['quantity'];
@@ -238,8 +249,6 @@ class PosController extends Controller
             $tax = $request->tax ?? 0;
             
             // Validasi: Total harus dihitung ulang di backend untuk keamanan
-            // Total = (Subtotal - Diskon) + Pajak
-            // Pastikan diskon tidak melebihi subtotal
             if ($discount > $subtotal) {
                 $discount = $subtotal;
             }
@@ -281,11 +290,13 @@ class PosController extends Controller
                 }
             }
 
-            // Create transaction
+            // Create transaction with branch_id and warehouse_id
             $transaction = Transaction::create([
                 'transaction_code' => Transaction::generateTransactionCode(),
                 'user_id' => auth()->id(),
                 'shift_id' => $shiftId,
+                'branch_id' => $branchId,
+                'warehouse_id' => $warehouseId,
                 'subtotal' => $subtotal,
                 'discount' => $discount,
                 'tax' => $tax,
@@ -300,7 +311,7 @@ class PosController extends Controller
                 'updated_at' => $transactionDate,
             ]);
 
-            // Create transaction items and update stock
+            // Create transaction items and update stock in product_warehouse
             foreach ($items as $item) {
                 TransactionItem::create([
                     'transaction_id' => $transaction->id,
@@ -313,12 +324,16 @@ class PosController extends Controller
                     'updated_at' => $transactionDate,
                 ]);
 
-                // Update product stock
-                $item['product']->decrement('stock', $item['quantity']);
+                // Update stock in product_warehouse (NOT products.stock)
+                DB::table('product_warehouse')
+                    ->where('product_id', $item['product']->id)
+                    ->where('warehouse_id', $warehouseId)
+                    ->decrement('stock', $item['quantity']);
 
-                // Record stock movement
+                // Record stock movement with warehouse_id
                 StockMovement::create([
                     'product_id' => $item['product']->id,
+                    'warehouse_id' => $warehouseId,
                     'type' => 'out',
                     'quantity' => $item['quantity'],
                     'reference_type' => 'App\Models\Transaction',
@@ -342,7 +357,7 @@ class PosController extends Controller
             }
 
             // Load transaction with items for receipt
-            $transaction->load(['items.product', 'user']);
+            $transaction->load(['items.product', 'user', 'branch', 'warehouse']);
 
             return response()->json([
                 'success' => true,
@@ -365,7 +380,7 @@ class PosController extends Controller
      */
     public function update(Request $request, Transaction $transaction)
     {
-        $transaction->load(['items.product', 'user']);
+        $transaction->load(['items.product', 'user', 'branch', 'warehouse']);
 
         return response()->json($transaction);
     }

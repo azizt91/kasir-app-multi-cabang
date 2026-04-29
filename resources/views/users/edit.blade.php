@@ -42,6 +42,16 @@
                             @error('role')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                         </div>
 
+                        <div class="mt-4">
+                            <label for="branch_id" class="block text-sm font-medium text-gray-700 mb-1">Cabang</label>
+                            <select name="branch_id" id="branch_id" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="">-- Pilih Cabang --</option>
+                                @foreach($branches as $branch)
+                                    <option value="{{ $branch->id }}" @selected(old('branch_id', $user->branch_id) == $branch->id)>{{ $branch->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
                         <!-- Permissions Section (Only for Kasir) -->
                         <div x-show="role === 'kasir'" x-transition class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <h3 class="text-sm font-medium text-gray-900 mb-3">Hak Akses Fitur & Menu (Khusus Kasir)</h3>

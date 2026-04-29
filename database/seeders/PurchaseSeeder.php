@@ -12,8 +12,11 @@ class PurchaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $user = \App\Models\User::first();
+        $user = \App\Models\User::whereNotNull('branch_id')->first() ?? \App\Models\User::first();
         if (!$user) return;
+
+        $warehouse = \App\Models\Warehouse::where('branch_id', $user->branch_id)->first() ?? \App\Models\Warehouse::first();
+        if (!$warehouse) return;
 
         $supplier = \App\Models\Supplier::first(); // Assumes at least one supplier exists, otherwise fillable is nullable
         $product = \App\Models\Product::first();
@@ -31,6 +34,7 @@ class PurchaseSeeder extends Seeder
         // Create Purchase
         $purchase = \App\Models\Purchase::create([
             'supplier_id' => $supplier ? $supplier->id : null,
+            'warehouse_id' => $warehouse->id,
             'transaction_code' => $code,
             'date' => now()->subDays(1),
             'total_amount' => $total,
@@ -47,17 +51,22 @@ class PurchaseSeeder extends Seeder
             'total_cost' => $total,
         ]);
 
-        // Update Product
-        $product->stock += $qty;
+        // Update Product (Legacy and Pivot)
         $product->purchase_price = $cost; // Updates to latest cost
         $product->save();
+
+        \Illuminate\Support\Facades\DB::table('product_warehouse')
+            ->where('product_id', $product->id)
+            ->where('warehouse_id', $warehouse->id)
+            ->increment('stock', $qty);
 
         // Log Movement
         \App\Models\StockMovement::create([
             'product_id' => $product->id,
+            'warehouse_id' => $warehouse->id,
             'type' => 'in',
             'quantity' => $qty,
-            'reference_type' => 'purchase',
+            'reference_type' => 'App\Models\Purchase',
             'reference_id' => $purchase->id,
             'notes' => 'Pembelian Stok: ' . $code,
         ]);

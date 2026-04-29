@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $product_id
+ * @property int|null $warehouse_id
  * @property string $type
  * @property int $quantity
  * @property string|null $reference_type
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \App\Models\Product $product
+ * @property-read \App\Models\Warehouse|null $warehouse
  * 
  * @method static \Illuminate\Database\Eloquent\Builder|StockMovement newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|StockMovement newQuery()
@@ -47,6 +49,7 @@ class StockMovement extends Model
      */
     protected $fillable = [
         'product_id',
+        'warehouse_id',
         'type',
         'quantity',
         'reference_type',
@@ -71,5 +74,13 @@ class StockMovement extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * Get the warehouse for the stock movement.
+     */
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 }

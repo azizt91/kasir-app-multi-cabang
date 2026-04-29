@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\BranchScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $transaction_code
  * @property int $user_id
+ * @property int|null $branch_id
+ * @property int|null $warehouse_id
  * @property string $subtotal
  * @property string $discount
  * @property string $tax
@@ -24,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \App\Models\User $user
+ * @property-read \App\Models\Branch|null $branch
+ * @property-read \App\Models\Warehouse|null $warehouse
  * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\TransactionItem[] $items
  * @property-read int|null $items_count
  * 
@@ -60,6 +65,8 @@ class Transaction extends Model
         'transaction_code',
         'user_id',
         'shift_id',
+        'branch_id',
+        'warehouse_id',
         'subtotal',
         'discount',
         'tax',
@@ -89,11 +96,36 @@ class Transaction extends Model
     ];
 
     /**
+     * The "booted" method of the model.
+     * Apply BranchScope so kasir can only see their branch's transactions.
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new BranchScope);
+    }
+
+    /**
      * Get the user that owns the transaction.
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the branch for the transaction.
+     */
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    /**
+     * Get the warehouse for the transaction.
+     */
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     /**
@@ -122,8 +154,9 @@ class Transaction extends Model
         $date = now()->format('Ymd');
         $prefix = "TRX{$date}";
         
-        // Find the last transaction code for today
-        $lastTransaction = static::where('transaction_code', 'like', "{$prefix}%")
+        // Find the last transaction code for today (without scope)
+        $lastTransaction = static::withoutGlobalScopes()
+            ->where('transaction_code', 'like', "{$prefix}%")
             ->orderBy('transaction_code', 'desc')
             ->first();
         

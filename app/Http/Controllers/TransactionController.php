@@ -10,14 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class TransactionController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
-        $query = Transaction::with('user');
+        $query = Transaction::with(['user', 'branch', 'warehouse']);
 
-        // Filter by Date Range
         if ($request->start_date && $request->end_date) {
             $query->whereBetween('created_at', [
                 $request->start_date . ' 00:00:00',
@@ -25,7 +21,6 @@ class TransactionController extends Controller
             ]);
         }
 
-        // Filter by Status
         if ($request->status) {
             if ($request->status == 'utang') {
                 $query->where('payment_method', 'utang');
@@ -34,35 +29,37 @@ class TransactionController extends Controller
             }
         }
 
+        // Filter by branch (admin only)
+        if ($request->branch_id && auth()->user()->role === 'admin') {
+            $query->where('branch_id', $request->branch_id);
+        }
+
         $transactions = $query->latest()->paginate(10);
+        $branches = auth()->user()->role === 'admin' ? \App\Models\Branch::active()->get() : collect();
         
         return view('transactions.index', [
             'transactions' => $transactions,
-            'filters' => $request->only(['start_date', 'end_date', 'status'])
+            'branches' => $branches,
+            'filters' => $request->only(['start_date', 'end_date', 'status', 'branch_id'])
         ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Transaction $transaction)
     {
-        $transaction->load(['items.product', 'user']);
+        $transaction->load(['items.product', 'user', 'branch', 'warehouse']);
         return view('transactions.show', compact('transaction'));
     }
 
-    /**
-     * Print the transaction receipt.
-     */
     public function print(Transaction $transaction)
     {
-        $transaction->load(['items.product', 'user']);
+        $transaction->load(['items.product', 'user', 'branch', 'warehouse']);
         $storeSettings = \App\Models\Setting::getStoreSettings();
         return view('transactions.print', compact('transaction', 'storeSettings'));
     }
 
     /**
      * Void (Cancel) the transaction.
+     * Restores stock to the CORRECT warehouse from the transaction.
      */
     public function destroy(Transaction $transaction)
     {
@@ -72,16 +69,23 @@ class TransactionController extends Controller
 
         try {
             DB::transaction(function () use ($transaction) {
-                // 1. Loop items to restore stock
+                $warehouseId = $transaction->warehouse_id;
+
                 foreach ($transaction->items as $item) {
                     $product = $item->product;
                     
-                    // Increment product stock
-                    $product->increment('stock', $item->quantity);
+                    // Restore stock to product_warehouse
+                    if ($warehouseId) {
+                        DB::table('product_warehouse')
+                            ->where('product_id', $product->id)
+                            ->where('warehouse_id', $warehouseId)
+                            ->increment('stock', $item->quantity);
+                    }
 
-                    // Record Stock Movement (IN)
+                    // Record Stock Movement (IN) with warehouse_id
                     StockMovement::create([
                         'product_id' => $product->id,
+                        'warehouse_id' => $warehouseId,
                         'type' => 'in',
                         'quantity' => $item->quantity,
                         'reference_type' => 'App\Models\Transaction',
@@ -92,11 +96,10 @@ class TransactionController extends Controller
                     ]);
                 }
 
-                // 2. Update Transaction Status
                 $transaction->update(['status' => 'void']);
             });
 
-            return back()->with('success', 'Transaksi berhasil dibatalkan. Stok telah dikembalikan sesuai permintaan pengguna.');
+            return back()->with('success', 'Transaksi berhasil dibatalkan. Stok telah dikembalikan.');
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal membatalkan transaksi: ' . $e->getMessage());
         }

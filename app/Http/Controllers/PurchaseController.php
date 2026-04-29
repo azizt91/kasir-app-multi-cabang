@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PurchaseController extends Controller
 {
     public function index()
     {
-        $purchases = \App\Models\Purchase::with(['supplier', 'items.product', 'user'])
+        $purchases = \App\Models\Purchase::with(['supplier', 'items.product', 'user', 'warehouse'])
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc')
             ->paginate(10);
@@ -19,15 +20,17 @@ class PurchaseController extends Controller
     {
         $suppliers = \App\Models\Supplier::all();
         $products = \App\Models\Product::all();
+        $warehouses = \App\Models\Warehouse::active()->with('branch')->get();
         $transactionCode = 'PO-' . date('Ymd') . '-' . rand(1000, 9999);
-        return view('purchases.create', compact('suppliers', 'products', 'transactionCode'));
+        return view('purchases.create', compact('suppliers', 'products', 'warehouses', 'transactionCode'));
     }
 
-    public function store(\Illuminate\Http\Request $request)
+    public function store(Request $request)
     {
         $request->validate([
             'date' => 'required|date',
             'transaction_code' => 'required|unique:purchases,transaction_code',
+            'warehouse_id' => 'required|exists:warehouses,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -35,17 +38,15 @@ class PurchaseController extends Controller
         ]);
 
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
-
-            // Calculate total amount
+            DB::beginTransaction();
             $totalAmount = 0;
             foreach ($request->items as $item) {
                 $totalAmount += $item['quantity'] * $item['unit_cost'];
             }
 
-            // Create Purchase Header
             $purchase = \App\Models\Purchase::create([
-                'supplier_id' => $request->supplier_id, // Nullable
+                'supplier_id' => $request->supplier_id,
+                'warehouse_id' => $request->warehouse_id,
                 'transaction_code' => $request->transaction_code,
                 'date' => $request->date,
                 'total_amount' => $totalAmount,
@@ -53,11 +54,8 @@ class PurchaseController extends Controller
                 'user_id' => auth()->id(),
             ]);
 
-            // Process Items
             foreach ($request->items as $itemData) {
                 $totalCost = $itemData['quantity'] * $itemData['unit_cost'];
-                
-                // Create Purchase Item
                 \App\Models\PurchaseItem::create([
                     'purchase_id' => $purchase->id,
                     'product_id' => $itemData['product_id'],
@@ -66,19 +64,19 @@ class PurchaseController extends Controller
                     'total_cost' => $totalCost,
                 ]);
 
-                // Update Product Stock & Price
                 $product = \App\Models\Product::find($itemData['product_id']);
-                
-                // Update Purchase Price (Using latest price)
                 $product->purchase_price = $itemData['unit_cost'];
-                
-                // Increase Stock
-                $product->stock += $itemData['quantity'];
                 $product->save();
 
-                // Log Movement
+                // Add stock to product_warehouse
+                DB::table('product_warehouse')->updateOrInsert(
+                    ['product_id' => $product->id, 'warehouse_id' => $request->warehouse_id],
+                    ['stock' => DB::raw('stock + ' . $itemData['quantity']), 'updated_at' => now()]
+                );
+
                 \App\Models\StockMovement::create([
                     'product_id' => $product->id,
+                    'warehouse_id' => $request->warehouse_id,
                     'type' => 'in',
                     'quantity' => $itemData['quantity'],
                     'reference_type' => 'purchase',
@@ -87,27 +85,27 @@ class PurchaseController extends Controller
                 ]);
             }
 
-            \Illuminate\Support\Facades\DB::commit();
+            DB::commit();
             return redirect()->route('purchases.index')->with('success', 'Pembelian berhasil disimpan dan stok telah diperbarui.');
-
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage())->withInput();
         }
     }
-
 
     public function edit(\App\Models\Purchase $purchase)
     {
         $suppliers = \App\Models\Supplier::all();
         $products = \App\Models\Product::all();
-        return view('purchases.edit', compact('purchase', 'suppliers', 'products'));
+        $warehouses = \App\Models\Warehouse::active()->with('branch')->get();
+        return view('purchases.edit', compact('purchase', 'suppliers', 'products', 'warehouses'));
     }
 
-    public function update(\Illuminate\Http\Request $request, \App\Models\Purchase $purchase)
+    public function update(Request $request, \App\Models\Purchase $purchase)
     {
         $request->validate([
             'date' => 'required|date',
+            'warehouse_id' => 'required|exists:warehouses,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -115,19 +113,21 @@ class PurchaseController extends Controller
         ]);
 
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
+            DB::beginTransaction();
+            $oldWarehouseId = $purchase->warehouse_id;
 
-            // 1. ROLLBACK OLD ITEMS (Stock & Logs)
+            // Rollback old items from old warehouse
             foreach ($purchase->items as $oldItem) {
                 $product = \App\Models\Product::find($oldItem->product_id);
                 if ($product) {
-                    $product->stock -= $oldItem->quantity;
-                    $product->save();
+                    DB::table('product_warehouse')
+                        ->where('product_id', $product->id)
+                        ->where('warehouse_id', $oldWarehouseId)
+                        ->decrement('stock', $oldItem->quantity);
 
-                    // Optional: Log reversal, or just rely on the fact that we edit.
-                    // To keep history clean, we can log a "Correction Out"
                     \App\Models\StockMovement::create([
                         'product_id' => $product->id,
+                        'warehouse_id' => $oldWarehouseId,
                         'type' => 'out',
                         'quantity' => $oldItem->quantity,
                         'reference_type' => 'purchase_edit_rollback',
@@ -136,10 +136,8 @@ class PurchaseController extends Controller
                     ]);
                 }
             }
-            // Delete old items
             $purchase->items()->delete();
 
-            // 2. UPDATE HEADER
             $totalAmount = 0;
             foreach ($request->items as $item) {
                 $totalAmount += $item['quantity'] * $item['unit_cost'];
@@ -147,15 +145,14 @@ class PurchaseController extends Controller
 
             $purchase->update([
                 'supplier_id' => $request->supplier_id,
+                'warehouse_id' => $request->warehouse_id,
                 'date' => $request->date,
                 'total_amount' => $totalAmount,
                 'note' => $request->note,
             ]);
 
-            // 3. RE-APPLY NEW ITEMS
             foreach ($request->items as $itemData) {
                 $totalCost = $itemData['quantity'] * $itemData['unit_cost'];
-                
                 \App\Models\PurchaseItem::create([
                     'purchase_id' => $purchase->id,
                     'product_id' => $itemData['product_id'],
@@ -164,15 +161,18 @@ class PurchaseController extends Controller
                     'total_cost' => $totalCost,
                 ]);
 
-                // Update Product Stock & Price
                 $product = \App\Models\Product::find($itemData['product_id']);
                 $product->purchase_price = $itemData['unit_cost'];
-                $product->stock += $itemData['quantity'];
                 $product->save();
 
-                // Log Movement (New)
+                DB::table('product_warehouse')->updateOrInsert(
+                    ['product_id' => $product->id, 'warehouse_id' => $request->warehouse_id],
+                    ['stock' => DB::raw('stock + ' . $itemData['quantity']), 'updated_at' => now()]
+                );
+
                 \App\Models\StockMovement::create([
                     'product_id' => $product->id,
+                    'warehouse_id' => $request->warehouse_id,
                     'type' => 'in',
                     'quantity' => $itemData['quantity'],
                     'reference_type' => 'purchase_edit_new',
@@ -181,11 +181,10 @@ class PurchaseController extends Controller
                 ]);
             }
 
-            \Illuminate\Support\Facades\DB::commit();
-            return redirect()->route('purchases.index')->with('success', 'Pembelian berhasil diperbarui. Stok lama ditarik dan stok baru ditambahkan.');
-
+            DB::commit();
+            return redirect()->route('purchases.index')->with('success', 'Pembelian berhasil diperbarui.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::rollBack();
             return back()->with('error', 'Gagal memperbarui pembelian: ' . $e->getMessage())->withInput();
         }
     }
@@ -193,18 +192,19 @@ class PurchaseController extends Controller
     public function destroy(\App\Models\Purchase $purchase)
     {
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
-
+            DB::beginTransaction();
+            $warehouseId = $purchase->warehouse_id;
             foreach ($purchase->items as $item) {
                 $product = \App\Models\Product::find($item->product_id);
                 if ($product) {
-                    // Reverse Stock
-                    $product->stock -= $item->quantity;
-                    $product->save();
+                    DB::table('product_warehouse')
+                        ->where('product_id', $product->id)
+                        ->where('warehouse_id', $warehouseId)
+                        ->decrement('stock', $item->quantity);
 
-                    // Log Movement (Adjustment/Void)
                     \App\Models\StockMovement::create([
                         'product_id' => $product->id,
+                        'warehouse_id' => $warehouseId,
                         'type' => 'out',
                         'quantity' => $item->quantity,
                         'reference_type' => 'purchase_void',
@@ -213,16 +213,12 @@ class PurchaseController extends Controller
                     ]);
                 }
             }
-
-            // Delete Items first (handled by cascade usually, but good to be explicit or if no cascade)
             $purchase->items()->delete();
             $purchase->delete();
-
-            \Illuminate\Support\Facades\DB::commit();
-            return redirect()->route('purchases.index')->with('success', 'Pembelian berhasil dihapus dan stok telah ditarik kembali.');
-
+            DB::commit();
+            return redirect()->route('purchases.index')->with('success', 'Pembelian berhasil dihapus.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::rollBack();
             return back()->with('error', 'Gagal menghapus pembelian: ' . $e->getMessage());
         }
     }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -19,6 +20,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property \Illuminate\Support\Carbon|null $email_verified_at
  * @property string $password
  * @property string $role
+ * @property int|null $branch_id
  * @property string|null $remember_token
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -26,6 +28,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property-read int|null $transactions_count
  * @property-read bool $is_admin
  * @property-read bool $is_kasir
+ * @property-read \App\Models\Branch|null $branch
  * 
  * @method static \Illuminate\Database\Eloquent\Builder|User newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|User newQuery()
@@ -60,6 +63,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'branch_id',
         'permissions',
         'fcm_token', // Added
     ];
@@ -100,6 +104,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the branch that the user belongs to.
+     */
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    /**
      * Get the transactions for the user.
      */
     public function transactions(): HasMany
@@ -133,6 +145,23 @@ class User extends Authenticatable
     public function getIsKasirAttribute(): bool
     {
         return $this->role === 'kasir';
+    }
+
+    /**
+     * Get the active warehouse for the user's branch.
+     * Returns the first active warehouse of the user's branch.
+     *
+     * @return \App\Models\Warehouse|null
+     */
+    public function getActiveWarehouse(): ?Warehouse
+    {
+        if (!$this->branch_id) {
+            return Warehouse::active()->first();
+        }
+
+        return Warehouse::where('branch_id', $this->branch_id)
+            ->active()
+            ->first();
     }
 
     /**

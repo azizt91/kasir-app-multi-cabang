@@ -12,13 +12,14 @@ class ExpenseSeeder extends Seeder
      */
     public function run(): void
     {
-        $user = \App\Models\User::first();
+        $user = \App\Models\User::whereNotNull('branch_id')->first() ?? \App\Models\User::first();
 
         if (!$user) {
             return;
         }
 
         \App\Models\Expense::create([
+            'branch_id' => $user->branch_id,
             'name' => 'Listrik',
             'description' => 'Bayar Listrik Bulan Ini',
             'amount' => 150000,
@@ -27,6 +28,7 @@ class ExpenseSeeder extends Seeder
         ]);
 
         \App\Models\Expense::create([
+            'branch_id' => $user->branch_id,
             'name' => 'ATK',
             'description' => 'Beli Alat Tulis Kantor',
             'amount' => 25000,
@@ -35,6 +37,7 @@ class ExpenseSeeder extends Seeder
         ]);
 
         \App\Models\Expense::create([
+            'branch_id' => $user->branch_id,
             'name' => 'Keamanan',
             'description' => 'Iuran Keamanan',
             'amount' => 50000,

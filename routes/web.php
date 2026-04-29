@@ -10,6 +10,9 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\CashFlowController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\BranchController;
+use App\Http\Controllers\WarehouseController;
+use App\Http\Controllers\StockTransferController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -62,6 +65,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/transactions/{transaction}/print', [\App\Http\Controllers\TransactionController::class, 'print'])->name('transactions.print')->middleware('permission:view_transactions');
     Route::resource('transactions', \App\Http\Controllers\TransactionController::class)->only(['index', 'show', 'destroy'])->middleware('permission:view_transactions');
     
+    // Stock Transfers
+    Route::resource('stock-transfers', StockTransferController::class)->only(['index', 'create', 'store', 'show'])->middleware('permission:view_products');
+    Route::get('/stock-transfers/get-stock', [StockTransferController::class, 'getStock'])->name('stock-transfers.get-stock')->middleware('permission:view_products');
+
     // Reports
     Route::middleware('permission:view_reports')->prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [ReportController::class, 'index'])->name('index');
@@ -87,6 +94,10 @@ Route::middleware('auth')->group(function () {
         Route::resource('users', UserController::class);
         Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
         Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
+
+        // Branch & Warehouse Management
+        Route::resource('branches', BranchController::class);
+        Route::resource('warehouses', WarehouseController::class);
     });
 });
 

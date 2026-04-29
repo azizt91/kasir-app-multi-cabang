@@ -193,6 +193,36 @@ use Illuminate\Support\Facades\Storage;
                 </a>
 
 
+                <!-- Cabang -->
+                <a href="{{ route('branches.index') }}"
+                   class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group {{ request()->routeIs('branches.*') ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}"
+                   data-tooltip="Manajemen Cabang">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    <span>Cabang</span>
+                </a>
+
+                <!-- Gudang -->
+                <a href="{{ route('warehouses.index') }}"
+                   class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group {{ request()->routeIs('warehouses.*') ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}"
+                   data-tooltip="Manajemen Gudang">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"></path>
+                    </svg>
+                    <span>Gudang</span>
+                </a>
+
+                <!-- Transfer Stok -->
+                <a href="{{ route('stock-transfers.index') }}"
+                   class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group {{ request()->routeIs('stock-transfers.*') ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}"
+                   data-tooltip="Transfer Stok">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    </svg>
+                    <span>Transfer Stok</span>
+                </a>
+
                 <!-- Settings -->
                 <a href="{{ route('settings.index') }}"
                    class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group {{ request()->routeIs('settings.*') ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}"
@@ -448,6 +478,33 @@ use Illuminate\Support\Facades\Storage;
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"></path>
                     </svg>
                     <span>Pengguna</span>
+                </a>
+
+                <a href="{{ route('branches.index') }}"
+                   class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 {{ request()->routeIs('branches.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}"
+                   @click="sidebarOpen = false">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    <span>Cabang</span>
+                </a>
+
+                <a href="{{ route('warehouses.index') }}"
+                   class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 {{ request()->routeIs('warehouses.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}"
+                   @click="sidebarOpen = false">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"></path>
+                    </svg>
+                    <span>Gudang</span>
+                </a>
+
+                <a href="{{ route('stock-transfers.index') }}"
+                   class="flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 {{ request()->routeIs('stock-transfers.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50' }}"
+                   @click="sidebarOpen = false">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    </svg>
+                    <span>Transfer Stok</span>
                 </a>
 
                 <a href="{{ route('settings.index') }}"

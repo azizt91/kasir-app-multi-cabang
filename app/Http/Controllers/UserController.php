@@ -45,8 +45,8 @@ class UserController extends Controller
     public function create()
     {
         $this->checkAdminAccess();
-
-        return view('users.create');
+        $branches = \App\Models\Branch::active()->get();
+        return view('users.create', compact('branches'));
     }
 
     /**
@@ -61,6 +61,7 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role' => 'required|in:admin,kasir',
+            'branch_id' => 'nullable|exists:branches,id',
         ]);
 
         User::create([
@@ -68,6 +69,7 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
+            'branch_id' => $request->branch_id,
             'permissions' => $request->role === 'kasir' ? $request->input('permissions', []) : null,
             'email_verified_at' => now(),
         ]);
@@ -92,8 +94,8 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $this->checkAdminAccess();
-
-        return view('users.edit', compact('user'));
+        $branches = \App\Models\Branch::active()->get();
+        return view('users.edit', compact('user', 'branches'));
     }
 
     /**
@@ -114,12 +116,14 @@ class UserController extends Controller
             ],
             'password' => 'nullable|string|min:8|confirmed',
             'role' => 'required|in:admin,kasir',
+            'branch_id' => 'nullable|exists:branches,id',
         ]);
 
         $updateData = [
             'name' => $request->name,
             'email' => $request->email,
             'role' => $request->role,
+            'branch_id' => $request->branch_id,
             'permissions' => $request->role === 'kasir' ? $request->input('permissions', []) : null,
         ];
 

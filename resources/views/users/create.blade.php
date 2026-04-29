@@ -41,6 +41,17 @@
                         @error('role')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
 
+                    <div>
+                        <label for="branch_id" class="block text-sm font-medium text-gray-700 mb-1">Cabang</label>
+                        <select name="branch_id" id="branch_id" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- Pilih Cabang --</option>
+                            @foreach($branches as $branch)
+                                <option value="{{ $branch->id }}" @selected(old('branch_id') == $branch->id)>{{ $branch->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('branch_id')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                    </div>
+
                     <div x-show="role === 'kasir'" class="space-y-4 border-t pt-4 border-gray-200">
                         <h3 class="text-lg font-medium text-gray-900">Hak Akses Kasir</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

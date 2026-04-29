@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -97,6 +98,16 @@ class Product extends Model
     }
 
     /**
+     * Get the warehouses this product is stocked in.
+     */
+    public function warehouses(): BelongsToMany
+    {
+        return $this->belongsToMany(Warehouse::class, 'product_warehouse')
+            ->withPivot('stock')
+            ->withTimestamps();
+    }
+
+    /**
      * Get the stock movements for the product.
      */
     public function stockMovements(): HasMany
@@ -113,24 +124,68 @@ class Product extends Model
     }
 
     /**
-     * Check if product stock is low.
+     * Get stock for a specific warehouse.
+     *
+     * @param int $warehouseId
+     * @return float
+     */
+    public function getStockInWarehouse(int $warehouseId): float
+    {
+        $pivot = \Illuminate\Support\Facades\DB::table('product_warehouse')
+            ->where('product_id', $this->id)
+            ->where('warehouse_id', $warehouseId)
+            ->first();
+
+        return $pivot ? (float) $pivot->stock : 0;
+    }
+
+    /**
+     * Get total stock across all warehouses.
+     *
+     * @return float
+     */
+    public function getTotalStock(): float
+    {
+        return (float) \Illuminate\Support\Facades\DB::table('product_warehouse')
+            ->where('product_id', $this->id)
+            ->sum('stock');
+    }
+
+    /**
+     * Check if product stock is low (uses total stock across all warehouses).
      *
      * @return bool
      */
     public function getIsLowStockAttribute(): bool
     {
-        return $this->stock <= $this->minimum_stock;
+        return $this->getTotalStock() <= $this->minimum_stock;
     }
 
     /**
-     * Scope a query to only include products with low stock.
+     * Scope a query to only include products with low stock (based on total stock).
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeLowStock($query)
     {
-        return $query->whereColumn('stock', '<=', 'minimum_stock');
+        return $query->whereHas('warehouses', function () {})
+            ->whereRaw('(SELECT COALESCE(SUM(pw.stock), 0) FROM product_warehouse pw WHERE pw.product_id = products.id) <= products.minimum_stock');
+    }
+
+    /**
+     * Scope: products with stock in a specific warehouse.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $warehouseId
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeInWarehouse($query, int $warehouseId)
+    {
+        return $query->whereHas('warehouses', function ($q) use ($warehouseId) {
+            $q->where('warehouses.id', $warehouseId)
+              ->where('product_warehouse.stock', '>', 0);
+        });
     }
 
     /**
