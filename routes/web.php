@@ -91,6 +91,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/cash-flow/export-pdf', [ReportController::class, 'exportCashFlowPdf'])->name('cash_flow.pdf');
         Route::get('/cash-flow/export-excel', [ReportController::class, 'exportCashFlowExcel'])->name('cash_flow.excel');
         Route::get('/shifts', [ReportController::class, 'shifts'])->name('shifts');
+        Route::get('/activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity_logs');
     });
 
     // Admin routes — accessible by all role=admin users (including Branch Admin)

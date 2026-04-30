@@ -523,6 +523,13 @@ class ReportController extends BaseController
         }
 
         $cashFlow->update(['status' => 'approved']);
+        
+        \App\Helpers\ActivityLogger::log(
+            'Approve Adjustment', 
+            "Menyetujui selisih kas (ID: {$cashFlow->id}) sebesar Rp " . number_format($cashFlow->amount, 0, ',', '.') . " untuk cabang ID: {$cashFlow->branch_id}.", 
+            $cashFlow
+        );
+
         return back()->with('success', 'Selisih kas berhasil disetujui dan telah mempengaruhi saldo kas.');
     }
 
@@ -539,6 +546,13 @@ class ReportController extends BaseController
             'status' => 'rejected',
             'rejection_reason' => $request->reason
         ]);
+        
+        \App\Helpers\ActivityLogger::log(
+            'Reject Adjustment', 
+            "Menolak selisih kas (ID: {$cashFlow->id}). Alasan: {$request->reason}", 
+            $cashFlow
+        );
+
         return back()->with('success', 'Selisih kas ditolak.');
     }
 }
