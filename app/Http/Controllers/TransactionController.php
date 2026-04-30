@@ -29,18 +29,14 @@ class TransactionController extends Controller
             }
         }
 
-        // Filter by branch (admin only)
-        if ($request->branch_id && auth()->user()->role === 'admin') {
-            $query->where('branch_id', $request->branch_id);
-        }
+        // Branch filtering is automatically handled by App\Models\Scopes\BranchScope
+        // based on the Global Filter session (admin_active_branch_id).
 
         $transactions = $query->latest()->paginate(10);
-        $branches = auth()->user()->role === 'admin' ? \App\Models\Branch::active()->get() : collect();
         
         return view('transactions.index', [
             'transactions' => $transactions,
-            'branches' => $branches,
-            'filters' => $request->only(['start_date', 'end_date', 'status', 'branch_id'])
+            'filters' => $request->only(['start_date', 'end_date', 'status'])
         ]);
     }
 

@@ -10,6 +10,11 @@ class StockTransfer extends Model
 {
     use HasFactory;
 
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\BranchScope);
+    }
+
     protected $fillable = [
         'transfer_code',
         'product_id',

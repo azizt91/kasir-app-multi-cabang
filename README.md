@@ -1,34 +1,53 @@
 # Kasir App - Aplikasi Kasir Berbasis Web (Multi-Cabang & Multi-Gudang)
 
-Kasir App adalah aplikasi Point of Sale (POS) berbasis web yang modern dan ramah pengguna, kini ditingkatkan dengan arsitektur **Multi-Cabang** dan **Multi-Gudang**. Dirancang untuk membantu mengelola transaksi penjualan, produk, dan stok di berbagai lokasi sekaligus dengan efisien.
+Kasir App adalah aplikasi Point of Sale (POS) berbasis web yang modern dan ramah pengguna, kini ditingkatkan dengan kapabilitas **Enterprise-Grade** seperti arsitektur **Multi-Cabang**, **Multi-Gudang**, **Sistem Shift Kasir**, dan **Identity Override**. Dirancang khusus untuk membantu pemilik bisnis mengelola transaksi penjualan, memantau pergerakan stok, dan melakukan audit keuangan di berbagai lokasi sekaligus secara terpusat dengan aman.
 
-## Fitur Utama
+## Fitur Unggulan Utama
 
-- **Multi-Cabang (Multi-Branch):** Kelola banyak outlet/cabang dalam satu sistem.
-- **Multi-Gudang (Multi-Warehouse):** Kelola stok di berbagai lokasi gudang per cabang.
-- **Transfer Stok Internal:** Pindahkan stok antar gudang dengan pencatatan mutasi yang akurat.
-- **Sistem Kasir (POS):** Antarmuka kasir cepat yang terisolasi per cabang (Kasir hanya melihat stok cabangnya sendiri).
-- **Manajemen Produk & Kategori:** Kelola produk tunggal maupun varian.
-- **Produk Varian:** Dukungan untuk produk dengan varian (Warna/Ukuran) dengan harga dan stok berbeda di tiap gudang.
-- **Multi Metode Pembayaran:** Tunai, Utang, Kartu, E-Wallet, Transfer.
-- **Manajemen Piutang:** Pencatatan nama customer dan pelacakan status pembayaran.
-- **Laporan Komprehensif:** Laporan penjualan, stok, produk, dan keuangan yang bisa difilter per cabang.
-- **Cetak Struk & Barcode:** Dukungan Thermal Printer (USB, Bluetooth, Browser) dan cetak label barcode.
-- **Hak Akses User:** Role Superadmin (Global), Admin Cabang, dan Kasir dengan izin akses spesifik.
-- **Manajemen Operasional:** Kelola Pembelian (Restok) ke gudang tertentu dan catat Biaya Operasional per cabang.
+### 🏢 Arsitektur Multi-Cabang & Multi-Gudang
+- **Global View & Cabang Scope:** Superadmin dapat memantau seluruh cabang melalui "Global View" atau memfilter data spesifik per cabang.
+- **Isolasi Data (Data Privacy):** Admin Cabang dan Kasir secara otomatis dibatasi (scoped) hanya dapat melihat dan mengelola data (pengguna, transaksi, kas, produk) di cabang mereka sendiri.
+- **Manajemen Multi-Gudang:** Setiap cabang dapat memiliki lebih dari satu gudang (contoh: Gudang Depan, Gudang Belakang).
+- **Mutasi Stok Akurat:** Stok produk dihitung berdasarkan pivot lokasi (tidak lagi terpusat pada satu tabel).
+
+### 📦 Sistem Transfer Stok & Approval
+- **Request Transfer:** Admin Cabang dapat mengajukan permintaan transfer stok (antar gudang internal atau antar cabang).
+- **Superadmin Approval Workflow:** Demi keamanan aset, perpindahan stok akan berstatus "Pending" dan membutuhkan persetujuan (Approve/Reject) langsung dari Superadmin.
+- **Otomatisasi Mutasi:** Stok akan otomatis terpotong di gudang asal dan bertambah di gudang tujuan saat disetujui, tercatat rapi di Riwayat Mutasi.
+
+### 🧾 Identity Override (Kustomisasi Struk per Cabang)
+- Setiap cabang dapat memiliki **identitas struk yang berbeda** (Logo, Alamat, Telepon, dan Footer Struk).
+- Jika pengaturan spesifik cabang tidak diisi, sistem secara cerdas akan melakukan fallback menggunakan **Pengaturan Pusat (Global)**.
+- Dukungan lebar kertas kustomisasi per cabang (58mm atau 80mm).
+- **Live Preview Struk:** Admin dapat melihat perubahan desain struk secara real-time langsung di dalam dashboard.
+
+### ⏱️ Sistem Shift & Audit Kasir (Cash Drawer Management)
+- **Open/Close Shift:** Kasir wajib membuka laci (memasukkan modal awal) saat mulai bekerja, dan menutup shift saat selesai.
+- **Pencatatan Selisih Kas:** Sistem otomatis menghitung total uang yang seharusnya ada di laci vs uang fisik yang diinput kasir.
+- **Approval Selisih Kas (Audit):** Jika kasir melaporkan adanya selisih kas (kurang/lebih), laporan akan masuk ke antrean Superadmin untuk diverifikasi dan disetujui sebelum dicatat sebagai pengeluaran/pemasukan sah.
+- **Laporan Shift:** Pelacakan akurat performa penjualan per kasir berdasarkan waktu kerjanya.
+
+### 🖨️ Dukungan Cetak Struk & Label
+- Mendukung konektivitas Thermal Printer via **Bluetooth**, **WebUSB**, dan dialog **Browser Default**.
+- Cetak label barcode otomatis untuk manajemen inventori.
+
+### 📊 Dashboard & Analitik Pintar
+- Analisis data penjualan, produk terlaris, notifikasi stok menipis.
+- **Widget Ringkasan Saldo Per Cabang:** Superadmin dapat memonitor likuiditas seluruh unit bisnis dalam satu tabel terpusat.
+- Grafik laporan keuangan otomatis.
 
 ## Panduan Printer
 
 Aplikasi ini mendukung pencetakan struk menggunakan Printer Thermal USB (WebUSB), Bluetooth, dan Browser Dialog.
 
-**Persyaratan WebUSB:**
+**Persyaratan WebUSB / Bluetooth API:**
 1.  **Browser:** Google Chrome, Microsoft Edge, atau Opera.
 2.  **HTTPS:** Wajib menggunakan protokol **https://** atau **http://localhost**.
 
 ## Teknologi
 
 - **Backend:** Laravel 11
-- **Frontend:** Blade, Tailwind CSS, Alpine.js
+- **Frontend:** Blade, Tailwind CSS, Alpine.js, Chart.js
 - **Database:** MySQL / MariaDB
 
 ## Prasyarat
@@ -81,18 +100,18 @@ Akses via browser: `http://127.0.0.1:8000`
 
 Sistem menggunakan data awal berbasis skenario untuk pengujian multi-cabang:
 
-| Role | Nama | Email | Branch | Password |
-|------|------|-------|--------|----------|
-| **Superadmin** | Superadmin | `admin@minimarket.com` | Global (All) | `password` |
-| **Admin** | Admin Pusat | `admin.pusat@minimarket.com` | Cabang Utama | `password` |
-| **Kasir** | Kasir Pusat | `kasir1@minimarket.com` | Cabang Utama | `password` |
-| **Kasir** | Kasir Bandung | `kasir2@minimarket.com` | Cabang Bandung | `password` |
+| Role | Nama | Email | Branch | Hak Akses Utama |
+|------|------|-------|--------|----------------|
+| **Superadmin** | Superadmin | `admin@minimarket.com` | Global (All) | Akses mutlak, Setting Pusat, Global View, Approval Stok & Kas. |
+| **Admin** | Admin Pusat | `admin.pusat@minimarket.com` | Cabang Utama | Manajemen Cabang Utama, Request Stok, Kelola User Cabang. |
+| **Kasir** | Kasir Pusat | `kasir1@minimarket.com` | Cabang Utama | Transaksi POS Cabang Utama, Manajemen Shift. |
+| **Kasir** | Kasir Bandung | `kasir2@minimarket.com` | Cabang Bandung | Transaksi POS Cabang Bandung, Manajemen Shift. |
 
-## Catatan Arsitektur
+## Catatan Arsitektur Multi-Tier
 
-- **Stok:** Stok tidak lagi disimpan di tabel `products`, melainkan di tabel pivot `product_warehouse` untuk mendukung multi-lokasi.
-- **Scope:** Data transaksi dan keuangan difilter secara otomatis berdasarkan cabang user yang sedang login (kecuali Superadmin).
+- **Stok Pivot:** Stok tidak lagi disimpan di tabel `products`, melainkan di tabel pivot `product_warehouse` untuk mendukung presisi lokasi stok.
+- **Security Scopes:** Query data dilindungi oleh global scope (`BranchScope`) dan autorisasi kontrol (*Gates/Policies*) yang memastikan Admin Cabang tidak dapat "mengintip" atau memanipulasi entitas di luar cabangnya.
 
 ---
 
-© 2025 Kasir App - Multi-Branch Edition
+© 2026 Kasir App - Enterprise Multi-Branch Edition

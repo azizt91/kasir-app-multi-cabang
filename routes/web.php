@@ -47,8 +47,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/pos/transaction', [PosController::class, 'store'])->name('pos.transaction');
     });
 
-
-
     // Protected Routes (Admin or Permission based)
     Route::resource('products', ProductController::class)->middleware('permission:view_products');
     Route::get('/products/barcodes/print', [App\Http\Controllers\ProductController::class, 'printBarcodes'])
@@ -61,13 +59,19 @@ Route::middleware('auth')->group(function () {
     Route::resource('expenses', \App\Http\Controllers\ExpenseController::class)->middleware('permission:view_expenses');
     Route::resource('suppliers', \App\Http\Controllers\SupplierController::class)->middleware('permission:view_suppliers');
     Route::resource('customers', \App\Http\Controllers\CustomerController::class)->middleware('permission:view_customers');
-    Route::resource('cash-flows', CashFlowController::class)->middleware('permission:view_cash_flows');
+    
+    // Cash Flow Management: View for authorized, but mutation only for Superadmin
+    Route::resource('cash-flows', CashFlowController::class)->except(['edit', 'update', 'destroy'])->middleware('permission:view_cash_flows');
+    
     Route::get('/transactions/{transaction}/print', [\App\Http\Controllers\TransactionController::class, 'print'])->name('transactions.print')->middleware('permission:view_transactions');
     Route::resource('transactions', \App\Http\Controllers\TransactionController::class)->only(['index', 'show', 'destroy'])->middleware('permission:view_transactions');
     
     // Stock Transfers
     Route::resource('stock-transfers', StockTransferController::class)->only(['index', 'create', 'store', 'show'])->middleware('permission:view_products');
     Route::get('/stock-transfers/get-stock', [StockTransferController::class, 'getStock'])->name('stock-transfers.get-stock')->middleware('permission:view_products');
+    
+    // Warehouse Management (Now accessible by Branch Admin via BranchScope)
+    Route::resource('warehouses', WarehouseController::class)->middleware('permission:view_products');
 
     // Reports
     Route::middleware('permission:view_reports')->prefix('reports')->name('reports.')->group(function () {
@@ -89,15 +93,36 @@ Route::middleware('auth')->group(function () {
         Route::get('/shifts', [ReportController::class, 'shifts'])->name('shifts');
     });
 
-    // Admin only routes
+    // Admin routes — accessible by all role=admin users (including Branch Admin)
     Route::middleware('admin')->group(function () {
         Route::resource('users', UserController::class);
+    });
+
+    // Superadmin-only routes — accessible ONLY by admin users with branch_id=null
+    Route::middleware('superadmin')->group(function () {
+        // Global system configuration
         Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
         Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
 
-        // Branch & Warehouse Management
+        // Branch Management
         Route::resource('branches', BranchController::class);
-        Route::resource('warehouses', WarehouseController::class);
+        
+        // Hybrid Strategy Filter
+        Route::post('/set-global-branch', [\App\Http\Controllers\BranchFilterController::class, 'setFilter'])->name('set-global-branch');
+
+        // [NEW] Cash Flow Approval & Mutation Security
+        Route::get('/reports/approvals', [ReportController::class, 'pendingAdjustments'])->name('reports.approvals');
+        Route::post('/reports/approvals/{cashFlow}/approve', [ReportController::class, 'approveAdjustment'])->name('reports.approve_adjustment');
+        Route::post('/reports/approvals/{cashFlow}/reject', [ReportController::class, 'rejectAdjustment'])->name('reports.reject_adjustment');
+        
+        // Stock Transfer Approvals
+        Route::post('/stock-transfers/{stockTransfer}/approve', [StockTransferController::class, 'approve'])->name('stock-transfers.approve');
+        Route::post('/stock-transfers/{stockTransfer}/reject', [StockTransferController::class, 'reject'])->name('stock-transfers.reject');
+
+        // Secure Delete for Cash Flows (moved from auth to superadmin)
+        Route::delete('/cash-flows/{cash_flow}', [CashFlowController::class, 'destroy'])->name('cash-flows.destroy');
+        Route::get('/cash-flows/{cash_flow}/edit', [CashFlowController::class, 'edit'])->name('cash-flows.edit');
+        Route::put('/cash-flows/{cash_flow}', [CashFlowController::class, 'update'])->name('cash-flows.update');
     });
 });
 

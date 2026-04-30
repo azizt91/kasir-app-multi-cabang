@@ -33,8 +33,18 @@ class UserController extends Controller
     // }
     public function index()
     {
-        // Ganti menjadi paginate() untuk membagi data per halaman.
-        $users = User::latest()->paginate(10); // Angka 10 bisa disesuaikan
+        $authUser = Auth::user();
+
+        if ($authUser->isSuperAdmin()) {
+            // Superadmin sees all users
+            $users = User::with('branch')->latest()->paginate(10);
+        } else {
+            // Branch Admin only sees users from their own branch
+            $users = User::with('branch')
+                ->where('branch_id', $authUser->branch_id)
+                ->latest()
+                ->paginate(10);
+        }
 
         return view('users.index', compact('users'));
     }
@@ -45,7 +55,14 @@ class UserController extends Controller
     public function create()
     {
         $this->checkAdminAccess();
-        $branches = \App\Models\Branch::active()->get();
+        $authUser = Auth::user();
+
+        if ($authUser->isSuperAdmin()) {
+            $branches = \App\Models\Branch::active()->get();
+        } else {
+            $branches = \App\Models\Branch::where('id', $authUser->branch_id)->get();
+        }
+
         return view('users.create', compact('branches'));
     }
 
@@ -55,6 +72,7 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $this->checkAdminAccess();
+        $authUser = Auth::user();
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -64,13 +82,24 @@ class UserController extends Controller
             'branch_id' => 'nullable|exists:branches,id',
         ]);
 
+        // Branch Admin can only create users in their own branch
+        $branchId = $authUser->isSuperAdmin()
+            ? $request->branch_id
+            : $authUser->branch_id;
+
+        // Branch Admin cannot create other admins with null branch_id (that would be a Superadmin)
+        $role = $request->role;
+        if (!$authUser->isSuperAdmin() && $role === 'admin') {
+            $role = 'kasir'; // Downgrade to kasir for safety
+        }
+
         User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'branch_id' => $request->branch_id,
-            'permissions' => $request->role === 'kasir' ? $request->input('permissions', []) : null,
+            'role' => $role,
+            'branch_id' => $branchId,
+            'permissions' => $role === 'kasir' ? $request->input('permissions', []) : null,
             'email_verified_at' => now(),
         ]);
 
@@ -94,7 +123,19 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $this->checkAdminAccess();
-        $branches = \App\Models\Branch::active()->get();
+        $authUser = Auth::user();
+
+        // Security: Branch Admin can only edit users from their own branch
+        if (!$authUser->isSuperAdmin() && $user->branch_id !== $authUser->branch_id) {
+            abort(403, 'Anda tidak diizinkan mengedit user dari cabang lain.');
+        }
+
+        if ($authUser->isSuperAdmin()) {
+            $branches = \App\Models\Branch::active()->get();
+        } else {
+            $branches = \App\Models\Branch::where('id', $authUser->branch_id)->get();
+        }
+
         return view('users.edit', compact('user', 'branches'));
     }
 
@@ -118,6 +159,22 @@ class UserController extends Controller
             'role' => 'required|in:admin,kasir',
             'branch_id' => 'nullable|exists:branches,id',
         ]);
+
+        $authUser = Auth::user();
+
+        // Security: Branch Admin cannot move user to another branch or modify users from other branches
+        if (!$authUser->isSuperAdmin()) {
+            if ($user->branch_id !== $authUser->branch_id) {
+                abort(403, 'Anda tidak diizinkan mengubah user dari cabang lain.');
+            }
+            $request->merge(['branch_id' => $authUser->branch_id]);
+            
+            // Branch Admin cannot promote to Superadmin (admin with null branch)
+            if ($request->role === 'admin' && is_null($authUser->branch_id)) {
+                 // this case should not happen based on logic but for safety:
+                 $request->merge(['role' => 'kasir']);
+            }
+        }
 
         $updateData = [
             'name' => $request->name,

@@ -20,7 +20,14 @@ class PurchaseController extends Controller
     {
         $suppliers = \App\Models\Supplier::all();
         $products = \App\Models\Product::all();
-        $warehouses = \App\Models\Warehouse::active()->with('branch')->get();
+        
+        $branchId = auth()->user()->branch_id ?? session('admin_active_branch_id');
+        $warehousesQuery = \App\Models\Warehouse::active()->with('branch');
+        if ($branchId) {
+            $warehousesQuery->where('branch_id', $branchId);
+        }
+        $warehouses = $warehousesQuery->get();
+
         $transactionCode = 'PO-' . date('Ymd') . '-' . rand(1000, 9999);
         return view('purchases.create', compact('suppliers', 'products', 'warehouses', 'transactionCode'));
     }
@@ -97,7 +104,14 @@ class PurchaseController extends Controller
     {
         $suppliers = \App\Models\Supplier::all();
         $products = \App\Models\Product::all();
-        $warehouses = \App\Models\Warehouse::active()->with('branch')->get();
+        
+        $branchId = auth()->user()->branch_id ?? session('admin_active_branch_id');
+        $warehousesQuery = \App\Models\Warehouse::active()->with('branch');
+        if ($branchId) {
+            $warehousesQuery->where('branch_id', $branchId);
+        }
+        $warehouses = $warehousesQuery->get();
+
         return view('purchases.edit', compact('purchase', 'suppliers', 'products', 'warehouses'));
     }
 

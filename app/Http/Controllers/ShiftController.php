@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CashierShift;
+use App\Models\CashFlow;
 use App\Models\Setting;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
@@ -89,8 +90,6 @@ class ShiftController extends Controller
             ->where('status', 'completed')
             ->sum('total_amount');
 
-        // Note: Asumsikan pengeluaran laci (jika ada fitur kasbon/expense dari laci) bisa dikurangkan di sini
-        // Namun sementara kita hitung Penjualan Tunai saja
         $expectedCash = $shift->starting_cash + $cashSales;
 
         return view('pos.shift.close', compact('shift', 'cashSales', 'expectedCash'));
@@ -137,6 +136,27 @@ class ShiftController extends Controller
             'status' => 'closed',
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Shift berhasil ditutup. Terima kasih!');
+        // LOGIKA BARU: Jika ada selisih, buat record di cash_flows (PENDING)
+        if ($difference != 0) {
+            CashFlow::create([
+                'date' => Carbon::today(),
+                'type' => $difference > 0 ? 'in' : 'out',
+                'category' => 'Selisih Kas',
+                'amount' => abs($difference),
+                'note' => "Selisih closing shift #{$shift->id} oleh " . auth()->user()->name . ". Ekspektasi: " . number_format($expectedCash) . ", Aktual: " . number_format($request->actual_cash),
+                'user_id' => auth()->id(),
+                'branch_id' => auth()->user()->branch_id,
+                'shift_id' => $shift->id,
+                'is_adjustment' => true,
+                'status' => 'pending', // Menunggu approval Superadmin
+            ]);
+        }
+
+        $msg = 'Shift berhasil ditutup.';
+        if ($difference != 0) {
+            $msg .= ' Terdapat selisih kas sebesar Rp ' . number_format(abs($difference), 0, ',', '.') . ' yang menunggu persetujuan Superadmin.';
+        }
+
+        return redirect()->route('dashboard')->with('success', $msg);
     }
 }

@@ -123,7 +123,7 @@
 <body>
     <div class="header">
         <h1>📦 LAPORAN STOK</h1>
-        <p><strong>Minimarket POS System</strong></p>
+        <p><strong>{{ auth()->user()->getActiveBranchName() }}</strong></p>
         <p>Dicetak pada: {{ now()->format('d M Y, H:i') }} WIB</p>
     </div>
 
@@ -167,22 +167,22 @@
         <tbody>
             @forelse($products as $index => $product)
                 @php
-                    $difference = $product->stock - $product->minimum_stock;
-                    $stockValue = $product->stock * $product->selling_price;
-                    $priority = $product->stock <= 0 ? 'Urgent' : ($product->stock <= $product->minimum_stock ? 'Tinggi' : 'Normal');
-                    $rowClass = $product->stock <= 0 ? 'row-urgent' : ($product->stock <= $product->minimum_stock ? 'row-warning' : '');
+                    $difference = $product->total_stock - $product->minimum_stock;
+                    $stockValue = $product->total_stock * $product->selling_price;
+                    $priority = $product->total_stock <= 0 ? 'Urgent' : ($product->total_stock <= $product->minimum_stock ? 'Tinggi' : 'Normal');
+                    $rowClass = $product->total_stock <= 0 ? 'row-urgent' : ($product->total_stock <= $product->minimum_stock ? 'row-warning' : '');
                 @endphp
                 <tr class="{{ $rowClass }}">
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>{{ $product->name }}</td>
                     <td>{{ $product->category->name ?? 'Tanpa Kategori' }}</td>
-                    <td class="text-center"><strong>{{ (float)$product->stock }}</strong></td>
+                    <td class="text-center"><strong>{{ (float)$product->total_stock }}</strong></td>
                     <td class="text-center">{{ (float)$product->minimum_stock }}</td>
                     <td class="text-center">{{ $difference >= 0 ? '+' : '' }}{{ (float)$difference }}</td>
                     <td class="text-center">
-                        @if($product->stock <= 0)
+                        @if($product->total_stock <= 0)
                             <span class="status-badge status-out">Habis</span>
-                        @elseif($product->stock <= $product->minimum_stock)
+                        @elseif($product->total_stock <= $product->minimum_stock)
                             <span class="status-badge status-low">Rendah</span>
                         @else
                             <span class="status-badge status-normal">Normal</span>

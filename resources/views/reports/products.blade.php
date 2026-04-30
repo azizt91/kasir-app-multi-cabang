@@ -12,7 +12,12 @@
                     </svg>
                 </a>
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">📦 Laporan Produk</h1>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                        <span>📦 Laporan Produk</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                            {{ auth()->user()->getActiveBranchName() }}
+                        </span>
+                    </h1>
                     <p class="text-gray-600 mt-1">Data produk dan inventory</p>
                 </div>
             </div>
@@ -148,8 +153,8 @@
                                             {{ $product->category->name ?? 'Tanpa Kategori' }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <span class="font-medium {{ $product->stock <= $product->minimum_stock ? 'text-red-600' : 'text-gray-900' }}">
-                                                {{ (float)$product->stock }}
+                                            <span class="font-medium {{ $product->total_stock <= $product->minimum_stock ? 'text-red-600' : 'text-gray-900' }}">
+                                                {{ (float)$product->total_stock }}
                                             </span>
                                             <span class="text-xs text-gray-500 block">Min: {{ (float)$product->minimum_stock }}</span>
                                         </td>
@@ -160,14 +165,14 @@
                                             Rp {{ number_format($product->selling_price, 0, ',', '.') }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            Rp {{ number_format($product->stock * $product->selling_price, 0, ',', '.') }}
+                                            Rp {{ number_format($product->total_stock * $product->selling_price, 0, ',', '.') }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            @if($product->stock <= 0)
+                                            @if($product->total_stock <= 0)
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                     Habis
                                                 </span>
-                                            @elseif($product->stock <= $product->minimum_stock)
+                                            @elseif($product->total_stock <= $product->minimum_stock)
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                                     Rendah
                                                 </span>
@@ -211,9 +216,9 @@
                                                 <p class="font-bold text-gray-900">{{ $product->name }}</p>
                                                 <p class="text-sm text-gray-500">{{ $product->category->name ?? 'N/A' }}</p>
                                             </div>
-                                            @if($product->stock <= 0)
+                                            @if($product->total_stock <= 0)
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Habis</span>
-                                            @elseif($product->stock <= $product->minimum_stock)
+                                            @elseif($product->total_stock <= $product->minimum_stock)
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Rendah</span>
                                             @else
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Normal</span>
@@ -226,7 +231,7 @@
                                 <div class="mt-4 pt-4 border-t border-gray-200 text-sm space-y-2">
                                     <div class="flex justify-between">
                                         <p class="text-gray-500">Stok</p>
-                                        <p class="font-medium {{ $product->stock <= $product->minimum_stock ? 'text-red-600' : 'text-gray-900' }}">{{ (float)$product->stock }} / min: {{ (float)$product->minimum_stock }}</p>
+                                        <p class="font-medium {{ $product->total_stock <= $product->minimum_stock ? 'text-red-600' : 'text-gray-900' }}">{{ (float)$product->total_stock }} / min: {{ (float)$product->minimum_stock }}</p>
                                     </div>
                                     <div class="flex justify-between">
                                         <p class="text-gray-500">Harga Beli</p>
@@ -238,7 +243,7 @@
                                     </div>
                                     <div class="flex justify-between border-t pt-2 mt-2">
                                         <p class="text-gray-500">Nilai Stok (Jual)</p>
-                                        <p class="font-bold">Rp {{ number_format($product->stock * $product->selling_price, 0, ',', '.') }}</p>
+                                        <p class="font-bold">Rp {{ number_format($product->total_stock * $product->selling_price, 0, ',', '.') }}</p>
                                     </div>
                                 </div>
                             </div>

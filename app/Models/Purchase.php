@@ -9,6 +9,11 @@ class Purchase extends Model
 {
     use HasFactory;
 
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\BranchScope);
+    }
+
     protected $fillable = [
         'supplier_id',
         'warehouse_id',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class WarehouseController extends Controller
 {
@@ -14,25 +15,47 @@ class WarehouseController extends Controller
             ->withCount('products')
             ->latest()
             ->paginate(10);
-        $branches = Branch::active()->get();
+            
+        $authUser = Auth::user();
+        if ($authUser->isSuperAdmin()) {
+            $branches = Branch::active()->get();
+        } else {
+            $branches = Branch::where('id', $authUser->branch_id)->get();
+        }
+        
         return view('warehouses.index', compact('warehouses', 'branches'));
     }
 
     public function create()
     {
-        $branches = Branch::active()->get();
+        $authUser = Auth::user();
+        if ($authUser->isSuperAdmin()) {
+            $branches = Branch::active()->get();
+        } else {
+            $branches = Branch::where('id', $authUser->branch_id)->get();
+        }
+        
         return view('warehouses.create', compact('branches'));
     }
 
     public function store(Request $request)
     {
+        $authUser = Auth::user();
+        
         $request->validate([
             'name' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'location' => 'nullable|string',
         ]);
 
-        $warehouse = Warehouse::create($request->only(['name', 'branch_id', 'location', 'is_active']));
+        $branchId = $authUser->isSuperAdmin() ? $request->branch_id : $authUser->branch_id;
+
+        $warehouse = Warehouse::create([
+            'name' => $request->name,
+            'branch_id' => $branchId,
+            'location' => $request->location,
+            'is_active' => $request->boolean('is_active', true),
+        ]);
 
         // Auto-create product_warehouse records for all existing products
         $products = \App\Models\Product::all();
@@ -51,25 +74,58 @@ class WarehouseController extends Controller
 
     public function edit(Warehouse $warehouse)
     {
-        $branches = Branch::active()->get();
+        $authUser = Auth::user();
+        
+        // Security check
+        if (!$authUser->isSuperAdmin() && $warehouse->branch_id !== $authUser->branch_id) {
+            abort(403, 'Anda tidak diizinkan mengelola gudang di cabang lain.');
+        }
+
+        if ($authUser->isSuperAdmin()) {
+            $branches = Branch::active()->get();
+        } else {
+            $branches = Branch::where('id', $authUser->branch_id)->get();
+        }
+        
         return view('warehouses.edit', compact('warehouse', 'branches'));
     }
 
     public function update(Request $request, Warehouse $warehouse)
     {
+        $authUser = Auth::user();
+        
+        // Security check
+        if (!$authUser->isSuperAdmin() && $warehouse->branch_id !== $authUser->branch_id) {
+            abort(403, 'Anda tidak diizinkan mengelola gudang di cabang lain.');
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'location' => 'nullable|string',
         ]);
 
-        $warehouse->update($request->only(['name', 'branch_id', 'location', 'is_active']));
+        $branchId = $authUser->isSuperAdmin() ? $request->branch_id : $authUser->branch_id;
+
+        $warehouse->update([
+            'name' => $request->name,
+            'branch_id' => $branchId,
+            'location' => $request->location,
+            'is_active' => $request->boolean('is_active', true),
+        ]);
 
         return redirect()->route('warehouses.index')->with('success', 'Gudang berhasil diperbarui.');
     }
 
     public function destroy(Warehouse $warehouse)
     {
+        $authUser = Auth::user();
+        
+        // Security check
+        if (!$authUser->isSuperAdmin() && $warehouse->branch_id !== $authUser->branch_id) {
+            abort(403, 'Anda tidak diizinkan mengelola gudang di cabang lain.');
+        }
+
         // Check if warehouse has stock
         $hasStock = \Illuminate\Support\Facades\DB::table('product_warehouse')
             ->where('warehouse_id', $warehouse->id)

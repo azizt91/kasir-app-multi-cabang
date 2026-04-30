@@ -90,7 +90,7 @@
 <body>
     <div class="header">
         <h1>LAPORAN PENJUALAN</h1>
-        <p><strong>Minimarket POS System</strong></p>
+        <p><strong>{{ auth()->user()->getActiveBranchName() }}</strong></p>
         <p>Periode: {{ \Carbon\Carbon::parse($startDate)->format('d M Y') }} - {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}</p>
         <p>Dicetak pada: {{ now()->format('d M Y, H:i') }} WIB</p>
     </div>

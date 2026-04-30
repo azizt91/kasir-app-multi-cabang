@@ -5,7 +5,12 @@
     <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
         <!-- Header -->
         <div class="mb-6 px-4 sm:px-0">
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">📊 Laporan & Statistik</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                    <span>📊 Laporan & Statistik</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        {{ auth()->user()->getActiveBranchName() }}
+                    </span>
+                </h1>
                 <p class="text-gray-600 mt-1">Dashboard analisis dan laporan bisnis</p>
         </div>
 

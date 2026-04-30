@@ -12,7 +12,12 @@
                     </svg>
                 </a>
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">📖 Buku Kas Umum</h1>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                        <span>📖 Buku Kas Umum</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                            {{ auth()->user()->getActiveBranchName() }}
+                        </span>
+                    </h1>
                     <p class="text-gray-600 mt-1">Histori mutasi kas gabungan secara kronologis</p>
                 </div>
             </div>
@@ -87,6 +92,9 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                                    @if(auth()->user()->isSuperAdmin() && !session('admin_active_branch_id'))
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-indigo-600">Cabang</th>
+                                    @endif
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori / Keterangan</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider text-green-600">Debit (Masuk)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider text-red-600">Kredit (Keluar)</th>
@@ -100,6 +108,9 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ \Carbon\Carbon::parse($startDate)->isoFormat('D MMM YYYY') }}
                                     </td>
+                                    @if(auth()->user()->isSuperAdmin() && !session('admin_active_branch_id'))
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
+                                    @endif
                                     <td class="px-6 py-4 text-sm text-gray-900">
                                         SALDO AWAL (Opening Balance)
                                     </td>
@@ -119,6 +130,11 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {{ \Carbon\Carbon::parse($row->date)->isoFormat('D MMM YYYY') }}
                                         </td>
+                                        @if(auth()->user()->isSuperAdmin() && !session('admin_active_branch_id'))
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
+                                                {{ $row->branch_name ?? '-' }}
+                                            </td>
+                                        @endif
                                         <td class="px-6 py-4 text-sm text-gray-900">
                                             <div class="flex flex-col">
                                                 <div class="flex items-center space-x-2">
@@ -154,7 +170,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-12 text-center text-gray-500 italic">
+                                        <td colspan="{{ (auth()->user()->isSuperAdmin() && !session('admin_active_branch_id')) ? 7 : 6 }}" class="px-6 py-12 text-center text-gray-500 italic">
                                             Tidak ada mutasi kas pada periode ini.
                                         </td>
                                     </tr>
@@ -162,7 +178,7 @@
                             </tbody>
                             <tfoot class="bg-gray-50">
                                 <tr>
-                                    <td colspan="5" class="px-6 py-4 text-right text-sm font-bold text-gray-900">
+                                    <td colspan="{{ (auth()->user()->isSuperAdmin() && !session('admin_active_branch_id')) ? 6 : 5 }}" class="px-6 py-4 text-right text-sm font-bold text-gray-900">
                                         SALDO AKHIR (Closing Balance)
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm font-bold text-indigo-700 bg-indigo-50">

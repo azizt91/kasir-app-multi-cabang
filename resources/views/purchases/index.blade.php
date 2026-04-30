@@ -5,7 +5,12 @@
     <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div class="sm:flex sm:items-center sm:justify-between pb-6 border-b-2 border-gray-200">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">📦 Pembelian Stok (Kulakan)</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                    <span>📦 Pembelian Stok</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        {{ auth()->user()->getActiveBranchName() }}
+                    </span>
+                </h1>
                 <p class="text-gray-600 mt-1">Riwayat belanja barang dagangan.</p>
             </div>
             <div class="mt-4 sm:mt-0">

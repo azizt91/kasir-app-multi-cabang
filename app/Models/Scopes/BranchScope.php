@@ -20,10 +20,45 @@ class BranchScope implements Scope
     public function apply(Builder $builder, Model $model): void
     {
         $user = auth()->user();
+        if (!$user) return;
 
-        // Only apply scope if user is authenticated and is NOT admin
-        if ($user && $user->role !== 'admin' && $user->branch_id) {
-            $builder->where($model->getTable() . '.branch_id', $user->branch_id);
+        $branchId = null;
+
+        // 1. Priority: If user has a branch_id (Kasir OR Branch Admin), always lock to it.
+        //    Superadmin has branch_id = null, so they skip this block.
+        if (!is_null($user->branch_id)) {
+            $branchId = $user->branch_id;
+        }
+        // 2. Superadmin only: respect the Hybrid View session filter
+        elseif ($user->isSuperAdmin() && session('admin_active_branch_id')) {
+            $branchId = session('admin_active_branch_id');
+        }
+
+        // 2. Apply the scope if a branch is determined
+        if ($branchId) {
+            if ($model instanceof \App\Models\Purchase || $model instanceof \App\Models\StockMovement) {
+                // Models related to branch via warehouse
+                $builder->whereHas('warehouse', function ($q) use ($branchId) {
+                    $q->where('branch_id', $branchId);
+                });
+            } elseif ($model instanceof \App\Models\StockTransfer) {
+                // Stock transfers involving this branch's warehouses
+                $builder->where(function ($q) use ($branchId) {
+                    $q->whereHas('fromWarehouse', function ($q2) use ($branchId) {
+                        $q2->where('branch_id', $branchId);
+                    })->orWhereHas('toWarehouse', function ($q2) use ($branchId) {
+                        $q2->where('branch_id', $branchId);
+                    });
+                });
+            } elseif ($model instanceof \App\Models\CashierShift) {
+                // Shifts related to branch via user
+                $builder->whereHas('user', function ($q) use ($branchId) {
+                    $q->where('branch_id', $branchId);
+                });
+            } else {
+                // Standard models with direct branch_id
+                $builder->where($model->getTable() . '.branch_id', $branchId);
+            }
         }
     }
 }

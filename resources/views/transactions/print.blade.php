@@ -5,7 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Struk Transaksi #{{ $transaction->transaction_code }}</title>
     @php
-        $paperWidth = ($storeSettings->paper_size ?? '58mm') === '80mm' ? 80 : 58;
+        $branch = $transaction->branch;
+        $paperWidthStr = $branch ? $branch->getPaperSize() : ($storeSettings->paper_size ?? '58');
+        $paperWidth = ($paperWidthStr === '80' || $paperWidthStr === '80mm') ? 80 : 58;
+
+        $receiptLogo = $branch ? $branch->getReceiptLogo() : ($storeSettings->store_logo ?? null);
+        $receiptAddress = $branch ? $branch->getReceiptAddress() : ($storeSettings->store_address ?? '');
+        $receiptPhone = $branch ? $branch->getReceiptPhone() : ($storeSettings->store_phone ?? '');
+        $receiptFooter = $branch ? $branch->getReceiptFooter() : ($storeSettings->receipt_footer ?? $storeSettings->store_description ?? '');
     @endphp
     <style>
         * {
@@ -98,12 +105,12 @@
 
     <div class="receipt-container">
     <div class="text-center">
-        @if(!empty($storeSettings->store_logo))
-            <img src="{{ asset('storage/' . $storeSettings->store_logo) }}" alt="Logo" style="max-width: 100%; max-height: 80px; display: block; margin: 0 auto 5px auto;">
+        @if(!empty($receiptLogo))
+            <img src="{{ asset('storage/' . $receiptLogo) }}" alt="Logo" style="max-width: 100%; max-height: 80px; display: block; margin: 0 auto 5px auto;">
         @endif
         <div class="store-name">{{ $storeSettings->store_name }}</div>
-        <div>{{ $storeSettings->store_address }}</div>
-        <div>Telp: {{ $storeSettings->store_phone }}</div>
+        <div>{{ $receiptAddress }}</div>
+        <div>Telp: {{ $receiptPhone }}</div>
     </div>
 
     <div class="border-top"></div>
@@ -136,7 +143,7 @@
             <div class="mb-1">
                 <div>{{ $item->product->name }}</div>
                 <div class="flex">
-                    <!-- Gunakan floatval untuk menghapus nol tidak perlu (contoh: 2.00 jadi 2, 0.50 jadi 0.5) -->
+                    <!-- Gunakan floatval untuk menghapus nol tidak perlu -->
                     <span>&nbsp;&nbsp;{{ floatval($item->quantity) }} x {{ number_format($item->price, 0, ',', '.') }}</span>
                     <span>{{ number_format($item->quantity * $item->price, 0, ',', '.') }}</span>
                 </div>
@@ -191,7 +198,7 @@
     <div class="border-top"></div>
 
     <div class="text-center" style="margin-top: 5px; margin-bottom: 0;">
-        {!! nl2br(e($storeSettings->store_description)) !!}
+        {!! nl2br(e($receiptFooter)) !!}
     </div>
     </div><!-- /.receipt-container -->
 
@@ -199,6 +206,14 @@
     <script>
         const transaction = @json($transaction);
         const storeSettings = @json($storeSettings);
+        
+        // Inject fallback values for Javascript print engine
+        storeSettings.paper_size = '{{ $paperWidthStr }}';
+        storeSettings.store_logo = '{{ $receiptLogo }}';
+        storeSettings.store_address = '{{ $receiptAddress }}';
+        storeSettings.store_phone = '{{ $receiptPhone }}';
+        storeSettings.store_description = '{{ str_replace("\n", '\n', $receiptFooter) }}';
+        
         const authUser = { name: "{{ $transaction->user->name ?? '-' }}" };
 
         async function doPrintUSB() {
@@ -239,10 +254,6 @@
                 window.print();
             } else {
                 // Bluetooth dan USB secara keamanan browser mewajibkan ada 'klik' (User Gesture).
-                // Jika dipaksa jalan otomatis di sini, browser akan langsung menolak dan
-                // memunculkan pesan error "Must be handling a user gesture".
-                // Oleh karena itu, biarkan user mengklik tombol "Cetak Struk" secara manual
-                // agar muncul jendela popup pairing perangkatnya.
                 console.log("Menunggu user mengklik tombol cetak untuk memunculkan dialog pairing " + defaultMethod);
             }
         }

@@ -35,12 +35,19 @@ class PosController extends Controller
      */
     public function index()
     {
+        $user = auth()->user();
+        $warehouse = $user->getActiveWarehouse();
+
+        if (!$warehouse) {
+            if ($user->isSuperAdmin()) {
+                return redirect()->route('dashboard')->with('error', 'POS: Anda sedang dalam mode Global View. Silakan pilih Cabang spesifik di sudut kanan atas sebelum menggunakan POS.');
+            }
+            abort(403, 'Tidak ada gudang aktif yang terhubung ke cabang Anda. Hubungi admin.');
+        }
+
         $categories = Category::all();
         $customers = \App\Models\Customer::orderBy('name')->get();
         $storeSettings = \App\Models\Setting::getStoreSettings(); // Tambahkan ini
-
-        $user = auth()->user();
-        $warehouse = $user->getActiveWarehouse();
         $branch = $user->branch;
 
         return view('pos.index', compact('categories', 'customers', 'storeSettings', 'warehouse', 'branch'));

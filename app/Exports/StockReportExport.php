@@ -44,16 +44,16 @@ class StockReportExport implements FromCollection, WithHeadings, WithMapping, Wi
 
     public function map($product): array
     {
-        $difference = $product->stock - $product->minimum_stock;
-        $stockValue = $product->stock * $product->selling_price;
+        $difference = $product->total_stock - $product->minimum_stock;
+        $stockValue = $product->total_stock * $product->selling_price;
         
         $stockStatus = 'Normal';
         $priority = 'Normal';
         
-        if ($product->stock <= 0) {
+        if ($product->total_stock <= 0) {
             $stockStatus = 'Habis';
             $priority = 'Urgent';
-        } elseif ($product->stock <= $product->minimum_stock) {
+        } elseif ($product->total_stock <= $product->minimum_stock) {
             $stockStatus = 'Rendah';
             $priority = 'Tinggi';
         }
@@ -62,7 +62,7 @@ class StockReportExport implements FromCollection, WithHeadings, WithMapping, Wi
             $product->name,
             $product->barcode,
             $product->category->name ?? 'Tanpa Kategori',
-            $product->stock,
+            $product->total_stock,
             $product->minimum_stock,
             $difference,
             $stockStatus,

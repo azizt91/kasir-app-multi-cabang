@@ -4,7 +4,12 @@
     <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div class="sm:flex sm:items-center sm:justify-between pb-6 border-b-2 border-gray-200">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">🔄 Transfer Stok</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                    <span>🔄 Transfer Stok</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        {{ auth()->user()->getActiveBranchName() }}
+                    </span>
+                </h1>
                 <p class="text-gray-600 mt-1">Riwayat perpindahan stok antar gudang.</p>
             </div>
             <div class="mt-4 sm:mt-0">
@@ -42,7 +47,7 @@
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Jumlah</th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -67,13 +72,29 @@
                                         @if($transfer->status === 'completed')
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Selesai</span>
                                         @elseif($transfer->status === 'pending')
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 animate-pulse">Menunggu</span>
                                         @else
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Batal</span>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Ditolak</span>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $transfer->user->name ?? '-' }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $transfer->created_at->isoFormat('D MMM YYYY HH:mm') }}</td>
+                                    <td class="px-6 py-4 text-center text-sm font-medium">
+                                        @if($transfer->status === 'pending' && auth()->user()->isSuperAdmin())
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <form action="{{ route('stock-transfers.approve', $transfer) }}" method="POST" onsubmit="return confirm('Setujui transfer stok ini?')">
+                                                    @csrf
+                                                    <button type="submit" class="text-green-600 hover:text-green-900 bg-green-50 px-2 py-1 rounded">Setujui</button>
+                                                </form>
+                                                <form action="{{ route('stock-transfers.reject', $transfer) }}" method="POST" onsubmit="return confirm('Tolak transfer stok ini?')">
+                                                    @csrf
+                                                    <button type="submit" class="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded">Tolak</button>
+                                                </form>
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400">-</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>

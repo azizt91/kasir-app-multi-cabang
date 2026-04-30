@@ -6,7 +6,12 @@
         <!-- Header -->
         <div class="sm:flex sm:items-center sm:justify-between pb-6 border-b-2 border-gray-200">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">📦 Manajemen Produk</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                    <span>📦 Manajemen Produk</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        {{ auth()->user()->getActiveBranchName() }}
+                    </span>
+                </h1>
                 <p class="text-gray-600 mt-1">Kelola semua produk dan stok di toko Anda.</p>
             </div>
             <div class="mt-4 sm:mt-0 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -106,7 +111,8 @@
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produk</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Jual</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stok</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stok Cabang</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stok Global</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th scope="col" class="relative px-6 py-3"><span class="sr-only">Aksi</span></th>
                             </tr>
@@ -130,7 +136,8 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">{{ $product->category->name ?? '-' }}</span></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">Rp {{ number_format($product->selling_price, 0, ',', '.') }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold {{ $product->stock <= $product->minimum_stock ? ($product->stock == 0 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-900' }}">{{ (float)$product->stock }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">{{ $product->branch_stock !== null ? (float)$product->branch_stock : '-' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold {{ $product->total_stock <= $product->minimum_stock ? ($product->total_stock == 0 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-900' }}">{{ (float)$product->total_stock }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         @if($product->stock <= $product->minimum_stock)
                                             @if($product->stock == 0)
@@ -175,8 +182,18 @@
                                     <p class="font-medium text-gray-800">{{ $product->category->name ?? '-' }}</p>
                                 </div>
                                 <div>
-                                    <p class="text-gray-500">Stok</p>
-                                    <p class="font-bold {{ $product->stock <= $product->minimum_stock ? ($product->stock == 0 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-900' }}">{{ (float)$product->stock }}</p>
+                                    <p class="text-gray-500">Harga Jual</p>
+                                    <p class="font-semibold text-green-600">Rp {{ number_format($product->selling_price, 0, ',', '.') }}</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p class="text-gray-500">Stok Cabang</p>
+                                    <p class="font-bold text-indigo-600">{{ $product->branch_stock !== null ? (float)$product->branch_stock : '-' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500">Stok Global</p>
+                                    <p class="font-bold {{ $product->total_stock <= $product->minimum_stock ? ($product->total_stock == 0 ? 'text-red-600' : 'text-yellow-600') : 'text-gray-900' }}">{{ (float)$product->total_stock }}</p>
                                 </div>
                             </div>
 

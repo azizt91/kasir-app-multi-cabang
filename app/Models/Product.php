@@ -162,15 +162,41 @@ class Product extends Model
     }
 
     /**
-     * Scope a query to only include products with low stock (based on total stock).
+     * Scope a query to only include products with low stock.
+     * Respects branch filtering if a branch ID is provided or detected from context.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  int|null $branchId
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeLowStock($query)
+    public function scopeLowStock($query, $branchId = null)
     {
-        return $query->whereHas('warehouses', function () {})
-            ->whereRaw('(SELECT COALESCE(SUM(pw.stock), 0) FROM product_warehouse pw WHERE pw.product_id = products.id) <= products.minimum_stock');
+        if (!$branchId) {
+            $user = auth()->user();
+            if ($user) {
+                if ($user->role !== 'admin' && $user->branch_id) {
+                    $branchId = $user->branch_id;
+                } elseif ($user->role === 'admin' && session('admin_active_branch_id')) {
+                    $branchId = session('admin_active_branch_id');
+                }
+            }
+        }
+
+        if ($branchId) {
+            return $query->whereHas('warehouses', function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId);
+            })->whereRaw('
+                (SELECT COALESCE(SUM(pw.stock), 0) 
+                 FROM product_warehouse pw 
+                 JOIN warehouses w ON pw.warehouse_id = w.id 
+                 WHERE pw.product_id = products.id 
+                 AND w.branch_id = ?) <= products.minimum_stock', [$branchId]);
+        }
+
+        return $query->whereRaw('
+            (SELECT COALESCE(SUM(pw.stock), 0) 
+             FROM product_warehouse pw 
+             WHERE pw.product_id = products.id) <= products.minimum_stock');
     }
 
     /**

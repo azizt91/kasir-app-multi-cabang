@@ -6,8 +6,11 @@
         <!-- Header Section -->
         <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
                     <span>📋 Laporan Shift Kasir</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 border border-orange-200">
+                        {{ auth()->user()->getActiveBranchName() }}
+                    </span>
                 </h1>
                 <p class="text-gray-600 mt-1">Riwayat pertanggungjawaban uang laci per kasir.</p>
             </div>

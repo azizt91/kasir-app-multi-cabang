@@ -12,6 +12,11 @@ class Warehouse extends Model
 {
     use HasFactory;
 
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\BranchScope);
+    }
+
     protected $fillable = [
         'branch_id',
         'name',

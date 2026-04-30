@@ -132,6 +132,179 @@
                     </a>
                 @endif
 
+                <!-- Branch Filter Component -->
+                @if(auth()->user()->isSuperAdmin())
+                    @php
+                        $activeBranchId = session('admin_active_branch_id');
+                        $activeBranchName = $activeBranchId ? \App\Models\Branch::find($activeBranchId)->name : 'Global View (Semua Cabang)';
+                        $branches = \App\Models\Branch::where('is_active', true)->get();
+                    @endphp
+
+                    <div x-data="{ branchMenuOpen: false, mobileBranchModal: false }" class="relative flex items-center">
+                        
+                        <!-- ========================================== -->
+                        <!-- MOBILE VIEW: Map Pin Icon (< 768px sm:hidden) -->
+                        <!-- ========================================== -->
+                        <button @click="mobileBranchModal = true" 
+                                class="sm:hidden p-2 rounded-lg transition-colors duration-200 relative
+                                {{ $activeBranchId ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-gray-500 hover:bg-gray-100' }}">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <!-- Map Pin Icon -->
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                            </svg>
+                            <!-- Badge indicator for specific branch -->
+                            @if($activeBranchId)
+                                <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-indigo-600 border-2 border-white rounded-full"></span>
+                            @endif
+                        </button>
+
+                        <!-- ========================================== -->
+                        <!-- DESKTOP/TABLET VIEW: Dropdown (sm:flex)    -->
+                        <!-- ========================================== -->
+                        <div class="hidden sm:block relative">
+                            <button @click="branchMenuOpen = !branchMenuOpen" @click.away="branchMenuOpen = false"
+                                    class="flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors duration-200
+                                    {{ $activeBranchId 
+                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' 
+                                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50' }}">
+                                <svg class="w-4 h-4 {{ $activeBranchId ? 'text-indigo-500' : 'text-gray-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                <span class="max-w-[150px] truncate">{{ $activeBranchName }}</span>
+                                <svg class="w-4 h-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+
+                            <!-- Dropdown List -->
+                            <div x-show="branchMenuOpen" 
+                                 x-transition:enter="transition ease-out duration-100"
+                                 x-transition:enter-start="transform opacity-0 scale-95"
+                                 x-transition:enter-end="transform opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="transform opacity-100 scale-100"
+                                 x-transition:leave-end="transform opacity-0 scale-95"
+                                 style="display: none;"
+                                 class="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                                
+                                <div class="px-4 py-2 border-b border-gray-100">
+                                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Konteks Data</p>
+                                </div>
+
+                                <!-- Opsi Global -->
+                                <form action="{{ route('set-global-branch') }}" method="POST">
+                                    @csrf
+                                    <input type="hidden" name="branch_id" value="">
+                                    <button type="submit" class="w-full text-left px-4 py-2.5 text-sm flex items-center justify-between {{ !$activeBranchId ? 'bg-gray-50 font-bold text-gray-900' : 'text-gray-700 hover:bg-gray-50' }}">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="w-2 h-2 rounded-full {{ !$activeBranchId ? 'bg-gray-800' : 'bg-transparent' }}"></span>
+                                            <span>Global View (Semua Cabang)</span>
+                                        </div>
+                                        @if(!$activeBranchId)
+                                            <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        @endif
+                                    </button>
+                                </form>
+
+                                <div class="border-t border-gray-100 my-1"></div>
+
+                                <!-- Opsi Per Cabang -->
+                                @foreach($branches as $branch)
+                                    <form action="{{ route('set-global-branch') }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="branch_id" value="{{ $branch->id }}">
+                                        <button type="submit" class="w-full text-left px-4 py-2.5 text-sm flex items-center justify-between {{ $activeBranchId == $branch->id ? 'bg-indigo-50 font-bold text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="w-2 h-2 rounded-full {{ $activeBranchId == $branch->id ? 'bg-indigo-600' : 'bg-transparent' }}"></span>
+                                                <span>{{ $branch->name }}</span>
+                                            </div>
+                                            @if($activeBranchId == $branch->id)
+                                                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                            @endif
+                                        </button>
+                                    </form>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <!-- ========================================== -->
+                        <!-- MOBILE MODAL (Bottom Sheet)                -->
+                        <!-- ========================================== -->
+                        <div x-show="mobileBranchModal" style="display: none;" class="relative z-[100]" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                            <div x-show="mobileBranchModal" 
+                                 x-transition:enter="ease-out duration-300"
+                                 x-transition:enter-start="opacity-0"
+                                 x-transition:enter-end="opacity-100"
+                                 x-transition:leave="ease-in duration-200"
+                                 x-transition:leave-start="opacity-100"
+                                 x-transition:leave-end="opacity-0"
+                                 class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+
+                            <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                                <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                                    <div x-show="mobileBranchModal"
+                                         @click.away="mobileBranchModal = false"
+                                         x-transition:enter="ease-out duration-300"
+                                         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                                         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                         x-transition:leave="ease-in duration-200"
+                                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                         x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                                         class="relative transform overflow-hidden rounded-t-xl sm:rounded-xl bg-white text-left shadow-xl transition-all w-full sm:my-8 sm:max-w-lg mt-auto">
+                                        
+                                        <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                                            <div class="sm:flex sm:items-start">
+                                                <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                                    <h3 class="text-lg font-semibold leading-6 text-gray-900 mb-4" id="modal-title">Pilih Konteks Cabang</h3>
+                                                    
+                                                    <div class="mt-2 space-y-2">
+                                                        <!-- Opsi Global Mobile -->
+                                                        <form action="{{ route('set-global-branch') }}" method="POST">
+                                                            @csrf
+                                                            <input type="hidden" name="branch_id" value="">
+                                                            <button type="submit" class="w-full rounded-lg border p-4 text-left flex items-center justify-between {{ !$activeBranchId ? 'border-gray-800 bg-gray-50 ring-1 ring-gray-800' : 'border-gray-200 hover:bg-gray-50' }}">
+                                                                <div>
+                                                                    <p class="font-semibold {{ !$activeBranchId ? 'text-gray-900' : 'text-gray-700' }}">Global View</p>
+                                                                    <p class="text-xs text-gray-500 mt-1">Lihat data kumulatif dari seluruh cabang</p>
+                                                                </div>
+                                                                @if(!$activeBranchId)
+                                                                    <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                                @endif
+                                                            </button>
+                                                        </form>
+
+                                                        <!-- Opsi Cabang Mobile -->
+                                                        @foreach($branches as $branch)
+                                                            <form action="{{ route('set-global-branch') }}" method="POST">
+                                                                @csrf
+                                                                <input type="hidden" name="branch_id" value="{{ $branch->id }}">
+                                                                <button type="submit" class="w-full rounded-lg border p-4 text-left flex items-center justify-between {{ $activeBranchId == $branch->id ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600' : 'border-gray-200 hover:bg-gray-50' }}">
+                                                                    <div>
+                                                                        <p class="font-semibold {{ $activeBranchId == $branch->id ? 'text-indigo-700' : 'text-gray-700' }}">{{ $branch->name }}</p>
+                                                                        <p class="text-xs text-gray-500 mt-1">{{ $branch->address ?? 'Filter khusus data cabang ini' }}</p>
+                                                                    </div>
+                                                                    @if($activeBranchId == $branch->id)
+                                                                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                                    @endif
+                                                                </button>
+                                                            </form>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                                            <button @click="mobileBranchModal = false" type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">Batal</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                @endif
+
                 <!-- Notifications -->
                 <div x-data="{ notificationsOpen: false }" class="relative">
                     <button @click="notificationsOpen = !notificationsOpen"
@@ -230,7 +403,7 @@
                             Profile
                         </a>
                         
-                        @if(auth()->user()->role === 'admin')
+                        @if(auth()->user()->isSuperAdmin())
                             <a href="{{ route('settings.index') }}" 
                                class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200">
                                 <svg class="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

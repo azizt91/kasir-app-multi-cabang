@@ -16,6 +16,7 @@
 
         @yield('scripts')
         <script src="//unpkg.com/alpinejs" defer></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     </head>
     <body class="font-inter antialiased bg-gray-50" x-data="{ sidebarOpen: false }" x-init="

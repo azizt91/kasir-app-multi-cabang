@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class CashierShift extends Model
 {
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\BranchScope);
+    }
+
     protected $fillable = [
         'user_id',
         'start_time',

@@ -12,7 +12,12 @@
                     </svg>
                 </a>
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">📦 Laporan Stok</h1>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                        <span>📋 Laporan Stok</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                            {{ auth()->user()->getActiveBranchName() }}
+                        </span>
+                    </h1>
                     <p class="text-gray-600 mt-1">Monitor inventory dan stok produk</p>
                 </div>
             </div>
@@ -128,12 +133,12 @@
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse($products as $product)
                                     @php
-                                        $difference = $product->stock - $product->minimum_stock;
-                                        $stockValue = $product->stock * $product->selling_price;
-                                        $priority = $product->stock <= 0 ? 'Urgent' : ($product->stock <= $product->minimum_stock ? 'Tinggi' : 'Normal');
-                                        $priorityColor = $product->stock <= 0 ? 'bg-red-100 text-red-800' : ($product->stock <= $product->minimum_stock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800');
+                                        $difference = $product->total_stock - $product->minimum_stock;
+                                        $stockValue = $product->total_stock * $product->selling_price;
+                                        $priority = $product->total_stock <= 0 ? 'Urgent' : ($product->total_stock <= $product->minimum_stock ? 'Tinggi' : 'Normal');
+                                        $priorityColor = $product->total_stock <= 0 ? 'bg-red-100 text-red-800' : ($product->total_stock <= $product->minimum_stock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800');
                                     @endphp
-                                    <tr class="hover:bg-gray-50 {{ $product->stock <= 0 ? 'bg-red-50' : ($product->stock <= $product->minimum_stock ? 'bg-yellow-50' : '') }}">
+                                    <tr class="hover:bg-gray-50 {{ $product->total_stock <= 0 ? 'bg-red-50' : ($product->total_stock <= $product->minimum_stock ? 'bg-yellow-50' : '') }}">
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 @if($product->image)
@@ -155,8 +160,8 @@
                                             {{ $product->category->name ?? 'Tanpa Kategori' }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="text-lg font-bold {{ $product->stock <= 0 ? 'text-red-600' : ($product->stock <= $product->minimum_stock ? 'text-yellow-600' : 'text-green-600') }}">
-                                                {{ (float)$product->stock }}
+                                            <span class="text-lg font-bold {{ $product->total_stock <= 0 ? 'text-red-600' : ($product->total_stock <= $product->minimum_stock ? 'text-yellow-600' : 'text-green-600') }}">
+                                                {{ (float)$product->total_stock }}
                                             </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -168,14 +173,14 @@
                                             </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            @if($product->stock <= 0)
+                                            @if($product->total_stock <= 0)
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
                                                     </svg>
                                                     Habis
                                                 </span>
-                                            @elseif($product->stock <= $product->minimum_stock)
+                                            @elseif($product->total_stock <= $product->minimum_stock)
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                                     <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
@@ -219,12 +224,12 @@
                     <div class="md:hidden space-y-4">
                         @forelse($products as $product)
                             @php
-                                $difference = $product->stock - $product->minimum_stock;
-                                $stockValue = $product->stock * $product->selling_price;
-                                $priority = $product->stock <= 0 ? 'Urgent' : ($product->stock <= $product->minimum_stock ? 'Tinggi' : 'Normal');
-                                $priorityColor = $product->stock <= 0 ? 'bg-red-100 text-red-800' : ($product->stock <= $product->minimum_stock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800');
+                                $difference = $product->total_stock - $product->minimum_stock;
+                                $stockValue = $product->total_stock * $product->selling_price;
+                                $priority = $product->total_stock <= 0 ? 'Urgent' : ($product->total_stock <= $product->minimum_stock ? 'Tinggi' : 'Normal');
+                                $priorityColor = $product->total_stock <= 0 ? 'bg-red-100 text-red-800' : ($product->total_stock <= $product->minimum_stock ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800');
                             @endphp
-                            <div class="bg-white rounded-xl shadow-md border {{ $product->stock <= 0 ? 'border-red-300' : ($product->stock <= $product->minimum_stock ? 'border-yellow-300' : 'border-gray-200') }} p-4">
+                            <div class="bg-white rounded-xl shadow-md border {{ $product->total_stock <= 0 ? 'border-red-300' : ($product->total_stock <= $product->minimum_stock ? 'border-yellow-300' : 'border-gray-200') }} p-4">
                                 <div class="flex items-start gap-4">
                                     @if($product->image)
                                         <img class="h-16 w-16 rounded-lg object-cover" src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}">
@@ -250,7 +255,7 @@
                                     <div class="flex justify-between items-center">
                                         <p class="text-gray-500">Stok</p>
                                         <div class="text-right">
-                                            <p class="font-bold text-lg {{ $product->stock <= 0 ? 'text-red-600' : ($product->stock <= $product->minimum_stock ? 'text-yellow-600' : 'text-green-600') }}">{{ (float)$product->stock }}</p>
+                                            <p class="font-bold text-lg {{ $product->total_stock <= 0 ? 'text-red-600' : ($product->total_stock <= $product->minimum_stock ? 'text-yellow-600' : 'text-green-600') }}">{{ (float)$product->total_stock }}</p>
                                             <p class="text-xs text-gray-500">Min: {{ (float)$product->minimum_stock }}</p>
                                         </div>
                                     </div>

@@ -15,6 +15,9 @@ class Branch extends Model
         'address',
         'phone',
         'is_active',
+        'receipt_footer',
+        'paper_size',
+        'logo',
     ];
 
     protected $casts = [
@@ -75,5 +78,45 @@ class Branch extends Model
     public function getDefaultWarehouse()
     {
         return $this->warehouses()->where('is_active', true)->first();
+    }
+
+    /**
+     * Get branch address or fallback to global setting.
+     */
+    public function getReceiptAddress(): string
+    {
+        return $this->address ?: Setting::getStoreSettings()->store_address ?? '';
+    }
+
+    /**
+     * Get branch phone or fallback to global setting.
+     */
+    public function getReceiptPhone(): string
+    {
+        return $this->phone ?: Setting::getStoreSettings()->store_phone ?? '';
+    }
+
+    /**
+     * Get branch receipt footer or fallback to global setting.
+     */
+    public function getReceiptFooter(): string
+    {
+        return $this->receipt_footer ?: Setting::getStoreSettings()->store_description ?? '';
+    }
+
+    /**
+     * Get branch receipt logo or fallback to global setting.
+     */
+    public function getReceiptLogo(): ?string
+    {
+        return $this->logo ?: Setting::getStoreSettings()->store_logo;
+    }
+
+    /**
+     * Get branch paper size.
+     */
+    public function getPaperSize(): string
+    {
+        return $this->paper_size ?: '58';
     }
 }

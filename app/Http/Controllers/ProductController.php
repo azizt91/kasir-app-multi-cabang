@@ -46,14 +46,24 @@ class ProductController extends Controller
             }
         }
 
+        $user = auth()->user();
+        $activeWarehouse = $user->getActiveWarehouse();
+
         $products = $query->latest()->paginate($perPage);
-        $products->getCollection()->transform(function ($product) {
+        $products->getCollection()->transform(function ($product) use ($activeWarehouse) {
             $product->total_stock = $product->getTotalStock();
+            $product->branch_stock = $activeWarehouse ? $product->getStockInWarehouse($activeWarehouse->id) : null;
             return $product;
         });
 
         $categories = Category::all();
-        $warehouses = Warehouse::active()->get();
+        
+        $branchId = auth()->user()->branch_id ?? session('admin_active_branch_id');
+        $warehousesQuery = Warehouse::active();
+        if ($branchId) {
+            $warehousesQuery->where('branch_id', $branchId);
+        }
+        $warehouses = $warehousesQuery->get();
 
         return view('products.index', [
             'products' => $products,
@@ -66,7 +76,14 @@ class ProductController extends Controller
     public function create()
     {
         $categories = Category::all();
-        $warehouses = Warehouse::active()->with('branch')->get();
+        
+        $branchId = auth()->user()->branch_id ?? session('admin_active_branch_id');
+        $warehousesQuery = Warehouse::active()->with('branch');
+        if ($branchId) {
+            $warehousesQuery->where('branch_id', $branchId);
+        }
+        $warehouses = $warehousesQuery->get();
+
         return view('products.create', compact('categories', 'warehouses'));
     }
 
@@ -155,7 +172,14 @@ class ProductController extends Controller
     public function edit(Product $product)
     {
         $categories = Category::all();
-        $warehouses = Warehouse::active()->with('branch')->get();
+        
+        $branchId = auth()->user()->branch_id ?? session('admin_active_branch_id');
+        $warehousesQuery = Warehouse::active()->with('branch');
+        if ($branchId) {
+            $warehousesQuery->where('branch_id', $branchId);
+        }
+        $warehouses = $warehousesQuery->get();
+
         $variants = [];
         if ($product->product_group_id) {
             $variants = Product::where('product_group_id', $product->product_group_id)->get();

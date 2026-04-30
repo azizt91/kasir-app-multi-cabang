@@ -7,6 +7,8 @@ use App\Models\TransactionItem;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\User;
+use App\Models\CashFlow;
+use App\Models\Branch;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Routing\Controller as BaseController;
@@ -21,6 +23,16 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends BaseController
 {
+    private function getActiveBranchId()
+    {
+        $user = auth()->user();
+        if (!$user) return null;
+        if ($user->isSuperAdmin()) {
+            return session('admin_active_branch_id');
+        }
+        return $user->branch_id;
+    }
+
     private function checkAdminAccess()
     {
         if (!auth()->check()) {
@@ -35,6 +47,7 @@ class ReportController extends BaseController
     public function index()
     {
         $this->checkAdminAccess();
+        $user = auth()->user();
         
         // Get summary statistics
         $today = Carbon::today();
@@ -61,7 +74,8 @@ class ReportController extends BaseController
             ->get();
 
         // Top selling products this month
-        $topProducts = Product::select([
+        $branchId = $this->getActiveBranchId();
+        $topProductsQuery = Product::select([
                 'products.id',
                 'products.name',
                 'products.barcode',
@@ -74,8 +88,13 @@ class ReportController extends BaseController
             ->with('category')
             ->join('transaction_items', 'products.id', '=', 'transaction_items.product_id')
             ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-            ->where('transactions.created_at', '>=', $thisMonth)
-            ->groupBy([
+            ->where('transactions.created_at', '>=', $thisMonth);
+        
+        if ($branchId) {
+            $topProductsQuery->where('transactions.branch_id', $branchId);
+        }
+
+        $topProducts = $topProductsQuery->groupBy([
                 'products.id',
                 'products.name',
                 'products.barcode',
@@ -89,25 +108,66 @@ class ReportController extends BaseController
 
         // Low stock products
         $lowStockProducts = Product::with('category')
-            ->lowStock()
+            ->lowStock($branchId)
             ->take(10)
             ->get();
-        $lowStockProducts->each(function ($p) { $p->total_stock = $p->getTotalStock(); });
+        
+        $activeWarehouse = $user->getActiveWarehouse();
+        $lowStockProducts->each(function ($p) use ($activeWarehouse) { 
+            $p->total_stock = $activeWarehouse ? $p->getStockInWarehouse($activeWarehouse->id) : $p->getTotalStock(); 
+        });
 
         // Calculate real-time cash balance (Saldo Kas Saat Ini)
+        // EXCLUDE pending adjustments
+        $whereBranchTrx = $branchId ? " AND branch_id = $branchId" : "";
+        $whereBranchPur = $branchId ? " AND warehouse_id IN (SELECT id FROM warehouses WHERE branch_id = $branchId)" : "";
+        $whereBranchExp = $branchId ? " AND branch_id = $branchId" : "";
+        $whereBranchCF = $branchId ? " AND branch_id = $branchId" : "";
+        
+        // Status condition for cash_flows: only approved or non-adjustment
+        $statusCond = " AND (status = 'approved' OR is_adjustment = 0 OR status IS NULL)";
+
         $currentBalance = DB::table(DB::raw("(
-            SELECT total_amount as debit, 0 as kredit FROM transactions WHERE status = 'completed' AND payment_method != 'utang'
+            SELECT total_amount as debit, 0 as kredit FROM transactions WHERE status = 'completed' AND payment_method != 'utang'$whereBranchTrx
             UNION ALL
-            SELECT 0, total_amount FROM purchases
+            SELECT 0, total_amount FROM purchases WHERE 1=1$whereBranchPur
             UNION ALL
-            SELECT 0, amount FROM expenses
+            SELECT 0, amount FROM expenses WHERE 1=1$whereBranchExp
             UNION ALL
-            SELECT CASE WHEN type = 'in' THEN amount ELSE 0 END, CASE WHEN type = 'out' THEN amount ELSE 0 END FROM cash_flows
+            SELECT CASE WHEN type = 'in' THEN amount ELSE 0 END, CASE WHEN type = 'out' THEN amount ELSE 0 END FROM cash_flows WHERE 1=1$whereBranchCF$statusCond
         ) as prev"))->selectRaw("SUM(debit) - SUM(kredit) as balance")->first()->balance ?? 0;
+
+        // Widget Saldo Per Cabang (for Superadmin)
+        $branchBalances = [];
+        if ($user->isSuperAdmin()) {
+            $branches = Branch::all();
+            foreach ($branches as $branch) {
+                $bId = $branch->id;
+                $wTrx = " AND branch_id = $bId";
+                $wPur = " AND warehouse_id IN (SELECT id FROM warehouses WHERE branch_id = $bId)";
+                $wExp = " AND branch_id = $bId";
+                $wCF = " AND branch_id = $bId";
+
+                $bal = DB::table(DB::raw("(
+                    SELECT total_amount as debit, 0 as kredit FROM transactions WHERE status = 'completed' AND payment_method != 'utang'$wTrx
+                    UNION ALL
+                    SELECT 0, total_amount FROM purchases WHERE 1=1$wPur
+                    UNION ALL
+                    SELECT 0, amount FROM expenses WHERE 1=1$wExp
+                    UNION ALL
+                    SELECT CASE WHEN type = 'in' THEN amount ELSE 0 END, CASE WHEN type = 'out' THEN amount ELSE 0 END FROM cash_flows WHERE 1=1$wCF$statusCond
+                ) as prev"))->selectRaw("SUM(debit) - SUM(kredit) as balance")->first()->balance ?? 0;
+                
+                $branchBalances[] = [
+                    'name' => $branch->name,
+                    'balance' => $bal
+                ];
+            }
+        }
 
         $storeSettings = \App\Models\Setting::getStoreSettings();
 
-        return view('reports.index', compact('stats', 'recentTransactions', 'topProducts', 'lowStockProducts', 'currentBalance', 'storeSettings'));
+        return view('reports.index', compact('stats', 'recentTransactions', 'topProducts', 'lowStockProducts', 'currentBalance', 'branchBalances', 'storeSettings'));
     }
 
     public function sales(Request $request)
@@ -131,7 +191,6 @@ class ReportController extends BaseController
             ->orderBy('date', 'desc');
 
         // Calculate Totals (Before Pagination)
-        // Use a separate query for totals to only include completed transactions
         $activeTransactionsQuery = $transactionsQuery->clone()->where('status', 'completed');
 
         $totalSales = $activeTransactionsQuery->sum('total_amount');
@@ -146,7 +205,7 @@ class ReportController extends BaseController
         $activeCount = $activeTransactionsQuery->count();
 
         $summary = [
-            'total_transactions' => $transactionsQuery->count(), // Total Logged Transactions
+            'total_transactions' => $transactionsQuery->count(),
             'total_amount' => $totalSales,
             'total_received' => $totalReceived,
             'total_receivables' => $totalReceivables,
@@ -159,7 +218,6 @@ class ReportController extends BaseController
         ];
 
         if ($format === 'pdf') {
-            // honest get() for export
             $transactions = $transactionsQuery->get();
             $expenses = $expensesQuery->get();
             $purchases = $purchasesQuery->get();
@@ -169,7 +227,6 @@ class ReportController extends BaseController
         }
 
         if ($format === 'excel') {
-            // honest get() for export
             $transactions = $transactionsQuery->get();
             $expenses = $expensesQuery->get();
             $purchases = $purchasesQuery->get();
@@ -178,7 +235,6 @@ class ReportController extends BaseController
                 'laporan-laba-rugi-' . $startDate . '-to-' . $endDate . '.xlsx');
         }
 
-        // Pagination for Web View
         $transactions = $transactionsQuery->paginate(10, ['*'], 'trans_page');
         $expenses = $expensesQuery->paginate(10, ['*'], 'exp_page');
         $purchases = $purchasesQuery->paginate(10, ['*'], 'purch_page');
@@ -202,9 +258,11 @@ class ReportController extends BaseController
         $products = $query->orderBy('name')->get();
         $categories = Category::orderBy('name')->get();
 
-        // Append total stock from product_warehouse
-        $products->each(function ($product) {
-            $product->total_stock = $product->getTotalStock();
+        $user = auth()->user();
+        $activeWarehouse = $user->getActiveWarehouse();
+
+        $products->each(function ($product) use ($activeWarehouse) {
+            $product->total_stock = $activeWarehouse ? $product->getStockInWarehouse($activeWarehouse->id) : $product->getTotalStock();
         });
 
         $summary = [
@@ -237,20 +295,24 @@ class ReportController extends BaseController
     {
         $this->checkAdminAccess();
         
-        $status = $request->get('status', 'all'); // all, low, out
+        $status = $request->get('status', 'all');
         $format = $request->get('format', 'view');
 
-        $query = Product::with('category');
+        $branchId = $this->getActiveBranchId();
+        $stockSubquery = '(SELECT COALESCE(SUM(pw.stock), 0) FROM product_warehouse pw';
+        if ($branchId) {
+            $stockSubquery .= ' JOIN warehouses w ON pw.warehouse_id = w.id WHERE w.branch_id = ' . (int)$branchId . ' AND pw.product_id = products.id)';
+        } else {
+            $stockSubquery .= ' WHERE pw.product_id = products.id)';
+        }
 
-        $stockSubquery = '(SELECT COALESCE(SUM(pw.stock), 0) FROM product_warehouse pw WHERE pw.product_id = products.id)';
+        $query = Product::query();
         switch ($status) {
             case 'low':
                 $query->whereRaw("$stockSubquery <= products.minimum_stock AND $stockSubquery > 0");
                 break;
             case 'out':
                 $query->whereRaw("$stockSubquery = 0");
-                break;
-            default:
                 break;
         }
 
@@ -276,9 +338,6 @@ class ReportController extends BaseController
         return view('reports.stock', compact('products', 'summary', 'status'));
     }
 
-    /**
-     * Display receivables (piutang) report - transactions with payment_method = 'utang'
-     */
     public function receivables(Request $request)
     {
         $this->checkAdminAccess();
@@ -305,9 +364,6 @@ class ReportController extends BaseController
         return view('reports.receivables', compact('transactions', 'summary', 'startDate', 'endDate'));
     }
 
-    /**
-     * Mark a receivable transaction as paid (change payment_method from 'utang' to 'cash')
-     */
     public function markAsPaid(Transaction $transaction)
     {
         $this->checkAdminAccess();
@@ -323,31 +379,37 @@ class ReportController extends BaseController
         return back()->with('success', 'Piutang berhasil ditandai sebagai lunas.');
     }
 
-    /**
-     * Retrieve and calculate cash flow report data avoiding query duplication
-     */
     private function getCashFlowData($startDate, $endDate)
     {
+        $branchId = $this->getActiveBranchId();
+        $whereBranchTrx = $branchId ? " AND branch_id = $branchId" : "";
+        $whereBranchPur = $branchId ? " AND warehouse_id IN (SELECT id FROM warehouses WHERE branch_id = $branchId)" : "";
+        $whereBranchExp = $branchId ? " AND branch_id = $branchId" : "";
+        $whereBranchCF = $branchId ? " AND branch_id = $branchId" : "";
+        
+        // Status condition for cash_flows: only approved or non-adjustment
+        $statusCond = " AND (status = 'approved' OR is_adjustment = 0 OR status IS NULL)";
+
         // 1. Calculate Opening Balance (before start_date)
         $openingBalance = DB::table(DB::raw("(
-            SELECT total_amount as debit, 0 as kredit FROM transactions WHERE status = 'completed' AND payment_method != 'utang' AND DATE(created_at) < '$startDate'
+            SELECT total_amount as debit, 0 as kredit FROM transactions WHERE status = 'completed' AND payment_method != 'utang' AND DATE(created_at) < '$startDate'$whereBranchTrx
             UNION ALL
-            SELECT 0, total_amount FROM purchases WHERE date < '$startDate'
+            SELECT 0, total_amount FROM purchases WHERE date < '$startDate'$whereBranchPur
             UNION ALL
-            SELECT 0, amount FROM expenses WHERE date < '$startDate'
+            SELECT 0, amount FROM expenses WHERE date < '$startDate'$whereBranchExp
             UNION ALL
-            SELECT CASE WHEN type = 'in' THEN amount ELSE 0 END, CASE WHEN type = 'out' THEN amount ELSE 0 END FROM cash_flows WHERE date < '$startDate'
+            SELECT CASE WHEN type = 'in' THEN amount ELSE 0 END, CASE WHEN type = 'out' THEN amount ELSE 0 END FROM cash_flows WHERE date < '$startDate'$whereBranchCF$statusCond
         ) as prev"))->selectRaw("SUM(debit) - SUM(kredit) as balance")->first()->balance ?? 0;
 
-        // 2. Fetch Transactions within Date Range using UNION ALL
+        // 2. Fetch Transactions within Date Range
         $query = "
-            (SELECT DATE(created_at) as date, '[TRX] Penjualan' as category, transaction_code as note, total_amount as debit, 0 as kredit, created_at as exact_time FROM transactions WHERE status = 'completed' AND payment_method != 'utang' AND DATE(created_at) BETWEEN ? AND ?)
+            (SELECT DATE(created_at) as date, '[TRX] Penjualan' as category, transaction_code as note, total_amount as debit, 0 as kredit, created_at as exact_time, branch_id FROM transactions WHERE status = 'completed' AND payment_method != 'utang' AND DATE(created_at) BETWEEN ? AND ?$whereBranchTrx)
             UNION ALL
-            (SELECT date, '[OUT] Pembelian Stok' as category, transaction_code as note, 0 as debit, total_amount as kredit, created_at as exact_time FROM purchases WHERE date BETWEEN ? AND ?)
+            (SELECT date, '[OUT] Pembelian Stok' as category, transaction_code as note, 0 as debit, total_amount as kredit, created_at as exact_time, (SELECT branch_id FROM warehouses WHERE id = purchases.warehouse_id) as branch_id FROM purchases WHERE date BETWEEN ? AND ?$whereBranchPur)
             UNION ALL
-            (SELECT date, '[OUT] Pengeluaran Operasional' as category, name as note, 0 as debit, amount as kredit, created_at as exact_time FROM expenses WHERE date BETWEEN ? AND ?)
+            (SELECT date, '[OUT] Pengeluaran Operasional' as category, name as note, 0 as debit, amount as kredit, created_at as exact_time, branch_id FROM expenses WHERE date BETWEEN ? AND ?$whereBranchExp)
             UNION ALL
-            (SELECT date, CONCAT('[KAS] ', category) as category, note, CASE WHEN type = 'in' THEN amount ELSE 0 END as debit, CASE WHEN type = 'out' THEN amount ELSE 0 END as kredit, created_at as exact_time FROM cash_flows WHERE date BETWEEN ? AND ?)
+            (SELECT date, CONCAT('[KAS] ', category) as category, note, CASE WHEN type = 'in' THEN amount ELSE 0 END as debit, CASE WHEN type = 'out' THEN amount ELSE 0 END as kredit, created_at as exact_time, branch_id FROM cash_flows WHERE date BETWEEN ? AND ?$whereBranchCF$statusCond)
             ORDER BY date ASC, exact_time ASC
         ";
 
@@ -363,6 +425,12 @@ class ReportController extends BaseController
         foreach ($results as $row) {
             $currentBalance += ($row->debit - $row->kredit);
             $row->balance = $currentBalance;
+            // Get branch name
+            if ($row->branch_id) {
+                $row->branch_name = Branch::find($row->branch_id)->name ?? '-';
+            } else {
+                $row->branch_name = 'Pusat';
+            }
         }
 
         return [
@@ -373,65 +441,43 @@ class ReportController extends BaseController
         ];
     }
 
-    /**
-     * Display the General Cash Book (Buku Kas Umum) report
-     */
     public function cashFlowReport(Request $request)
     {
         $this->checkAdminAccess();
-
         $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-
         $data = $this->getCashFlowData($startDate, $endDate);
-
         return view('reports.cash-flow', $data);
     }
 
-    /**
-     * Export Cash Flow Report to PDF
-     */
     public function exportCashFlowPdf(Request $request)
     {
         $this->checkAdminAccess();
-        
         $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-
         $data = $this->getCashFlowData($startDate, $endDate);
-        
         $pdf = Pdf::loadView('reports.cash-flow-pdf', $data);
         return $pdf->download('buku-kas-umum-' . $startDate . '-to-' . $endDate . '.pdf');
     }
 
-    /**
-     * Export Cash Flow Report to Excel
-     */
     public function exportCashFlowExcel(Request $request)
     {
         $this->checkAdminAccess();
-        
         $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-
         $data = $this->getCashFlowData($startDate, $endDate);
-
         return Excel::download(new CashFlowReportExport($data['results'], $data['openingBalance'], $startDate, $endDate), 
             'buku-kas-umum-' . $startDate . '-to-' . $endDate . '.xlsx');
     }
 
-    /**
-     * Display cashier shifts report
-     */
     public function shifts(Request $request)
     {
         $this->checkAdminAccess();
-        
         $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
         $format = $request->get('format', 'view');
 
-        $query = \App\Models\CashierShift::with('user')
+        $query = \App\Models\CashierShift::with(['user', 'user.branch'])
             ->whereBetween('start_time', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
             ->orderBy('start_time', 'desc');
 
@@ -449,7 +495,50 @@ class ReportController extends BaseController
 
         $shifts = $query->paginate(15);
         $storeSettings = \App\Models\Setting::getStoreSettings();
-
         return view('reports.shifts', compact('shifts', 'startDate', 'endDate', 'storeSettings'));
+    }
+
+    // [NEW] Approval Methods for Discrepancies
+    public function pendingAdjustments()
+    {
+        $this->checkAdminAccess();
+        if (!auth()->user()->isSuperAdmin()) {
+            abort(403, 'Hanya Superadmin yang dapat menyetujui selisih kas.');
+        }
+
+        $pendingAdjustments = CashFlow::with(['user', 'branch', 'shift'])
+            ->where('status', 'pending')
+            ->where('is_adjustment', true)
+            ->latest()
+            ->get();
+
+        return view('reports.approvals', compact('pendingAdjustments'));
+    }
+
+    public function approveAdjustment(CashFlow $cashFlow)
+    {
+        $this->checkAdminAccess();
+        if (!auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $cashFlow->update(['status' => 'approved']);
+        return back()->with('success', 'Selisih kas berhasil disetujui dan telah mempengaruhi saldo kas.');
+    }
+
+    public function rejectAdjustment(Request $request, CashFlow $cashFlow)
+    {
+        $this->checkAdminAccess();
+        if (!auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $request->validate(['reason' => 'required|string|max:255']);
+
+        $cashFlow->update([
+            'status' => 'rejected',
+            'rejection_reason' => $request->reason
+        ]);
+        return back()->with('success', 'Selisih kas ditolak.');
     }
 }

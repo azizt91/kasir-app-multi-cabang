@@ -42,6 +42,11 @@ class StockMovement extends Model
 {
     use HasFactory;
 
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\BranchScope);
+    }
+
     /**
      * The attributes that are mass assignable.
      *

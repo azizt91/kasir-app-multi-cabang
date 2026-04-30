@@ -7,7 +7,12 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
             <div class="flex items-center space-x-4">
                 <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">📝 Laporan Piutang</h1>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                        <span>📝 Laporan Piutang</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 border border-orange-200">
+                            {{ auth()->user()->getActiveBranchName() }}
+                        </span>
+                    </h1>
                     <p class="text-gray-600 mt-1 text-sm">Daftar transaksi dengan metode pembayaran utang</p>
                 </div>
             </div>

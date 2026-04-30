@@ -7,6 +7,11 @@ use App\Models\User; // Assuming User model is in App\Models
 
 class Expense extends Model
 {
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Models\Scopes\BranchScope);
+    }
+
     protected $fillable = [
         'name',
         'description',

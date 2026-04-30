@@ -26,12 +26,18 @@ class ExpenseController extends Controller
             'date' => 'required|date',
         ]);
 
+        $branchId = auth()->user()->branch_id;
+        if (is_null($branchId) && session('admin_active_branch_id')) {
+            $branchId = session('admin_active_branch_id');
+        }
+
         Expense::create([
             'name' => $validated['description'],
             'description' => $validated['description'],
             'amount' => $validated['amount'],
             'date' => $validated['date'],
             'user_id' => auth()->id(),
+            'branch_id' => $branchId,
         ]);
 
         return redirect()->route('expenses.index')->with('success', 'Pengeluaran berhasil disimpan.');

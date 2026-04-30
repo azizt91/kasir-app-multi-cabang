@@ -5,8 +5,12 @@
     <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div class="sm:flex sm:items-center sm:justify-between pb-6 border-b-2 border-gray-200">
             <div>
-
-                <h1 class="text-3xl font-bold text-gray-900">💸 Pengeluaran Operasional</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+                    <span>💸 Pengeluaran Operasional</span>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                        {{ auth()->user()->getActiveBranchName() }}
+                    </span>
+                </h1>
                 <p class="text-gray-600 mt-1">Daftar biaya operasional toko.</p>
             </div>
             <div class="mt-4 sm:mt-0">

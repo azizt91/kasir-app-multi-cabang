@@ -51,54 +51,20 @@ class StockTransferController extends Controller
                 throw new \Exception("Stok di gudang \"{$fromWarehouse->name}\" tidak mencukupi. Tersedia: {$sourceStock}, Diminta: {$quantity}");
             }
 
-            // Create transfer record
+            // Create transfer record as pending
             $transfer = StockTransfer::create([
                 'transfer_code' => StockTransfer::generateTransferCode(),
                 'product_id' => $product->id,
                 'from_warehouse_id' => $fromWarehouse->id,
                 'to_warehouse_id' => $toWarehouse->id,
                 'quantity' => $quantity,
-                'status' => 'completed',
+                'status' => 'pending', // Default to pending
                 'user_id' => auth()->id(),
                 'notes' => $request->notes,
             ]);
 
-            // Deduct from source warehouse
-            DB::table('product_warehouse')
-                ->where('product_id', $product->id)
-                ->where('warehouse_id', $fromWarehouse->id)
-                ->decrement('stock', $quantity);
-
-            // Add to destination warehouse (upsert)
-            DB::table('product_warehouse')->updateOrInsert(
-                ['product_id' => $product->id, 'warehouse_id' => $toWarehouse->id],
-                ['stock' => DB::raw('COALESCE(stock, 0) + ' . $quantity), 'updated_at' => now()]
-            );
-
-            // Stock movement: OUT from source
-            StockMovement::create([
-                'product_id' => $product->id,
-                'warehouse_id' => $fromWarehouse->id,
-                'type' => 'out',
-                'quantity' => $quantity,
-                'reference_type' => 'App\Models\StockTransfer',
-                'reference_id' => $transfer->id,
-                'notes' => "Transfer keluar ke {$toWarehouse->name} - {$transfer->transfer_code}",
-            ]);
-
-            // Stock movement: IN to destination
-            StockMovement::create([
-                'product_id' => $product->id,
-                'warehouse_id' => $toWarehouse->id,
-                'type' => 'in',
-                'quantity' => $quantity,
-                'reference_type' => 'App\Models\StockTransfer',
-                'reference_id' => $transfer->id,
-                'notes' => "Transfer masuk dari {$fromWarehouse->name} - {$transfer->transfer_code}",
-            ]);
-
             DB::commit();
-            return redirect()->route('stock-transfers.index')->with('success', "Transfer stok berhasil: {$quantity} {$product->name} dari {$fromWarehouse->name} ke {$toWarehouse->name}");
+            return redirect()->route('stock-transfers.index')->with('success', "Permintaan transfer stok berhasil dibuat. Menunggu persetujuan Superadmin.");
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', $e->getMessage())->withInput();
@@ -109,6 +75,95 @@ class StockTransferController extends Controller
     {
         $stockTransfer->load(['product', 'fromWarehouse.branch', 'toWarehouse.branch', 'user']);
         return view('stock_transfers.show', compact('stockTransfer'));
+    }
+
+    /**
+     * Approve a stock transfer request (Superadmin only).
+     */
+    public function approve(StockTransfer $stockTransfer)
+    {
+        if (!auth()->user()->isSuperAdmin()) {
+            abort(403, 'Hanya Superadmin yang dapat menyetujui transfer stok.');
+        }
+
+        if ($stockTransfer->status !== 'pending') {
+            return back()->with('error', 'Hanya permintaan dengan status pending yang dapat disetujui.');
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $product = $stockTransfer->product;
+            $fromWarehouse = $stockTransfer->fromWarehouse;
+            $toWarehouse = $stockTransfer->toWarehouse;
+            $quantity = $stockTransfer->quantity;
+
+            // Final check on stock before approval
+            $sourceStock = $product->getStockInWarehouse($fromWarehouse->id);
+            if ($sourceStock < $quantity) {
+                throw new \Exception("Stok di gudang \"{$fromWarehouse->name}\" saat ini tidak mencukupi untuk disetujui.");
+            }
+
+            // Deduct from source warehouse
+            DB::table('product_warehouse')
+                ->where('product_id', $product->id)
+                ->where('warehouse_id', $fromWarehouse->id)
+                ->decrement('stock', $quantity);
+
+            // Add to destination warehouse
+            DB::table('product_warehouse')->updateOrInsert(
+                ['product_id' => $product->id, 'warehouse_id' => $toWarehouse->id],
+                ['stock' => DB::raw('COALESCE(stock, 0) + ' . $quantity), 'updated_at' => now()]
+            );
+
+            // Create Stock Movements
+            StockMovement::create([
+                'product_id' => $product->id,
+                'warehouse_id' => $fromWarehouse->id,
+                'type' => 'out',
+                'quantity' => $quantity,
+                'reference_type' => 'App\Models\StockTransfer',
+                'reference_id' => $stockTransfer->id,
+                'notes' => "Transfer (Approved) keluar ke {$toWarehouse->name} - {$stockTransfer->transfer_code}",
+            ]);
+
+            StockMovement::create([
+                'product_id' => $product->id,
+                'warehouse_id' => $toWarehouse->id,
+                'type' => 'in',
+                'quantity' => $quantity,
+                'reference_type' => 'App\Models\StockTransfer',
+                'reference_id' => $stockTransfer->id,
+                'notes' => "Transfer (Approved) masuk dari {$fromWarehouse->name} - {$stockTransfer->transfer_code}",
+            ]);
+
+            // Update status
+            $stockTransfer->update(['status' => 'completed']);
+
+            DB::commit();
+            return redirect()->route('stock-transfers.index')->with('success', 'Transfer stok berhasil disetujui dan stok telah diperbarui.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal menyetujui transfer: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Reject a stock transfer request (Superadmin only).
+     */
+    public function reject(StockTransfer $stockTransfer)
+    {
+        if (!auth()->user()->isSuperAdmin()) {
+            abort(403, 'Hanya Superadmin yang dapat menolak transfer stok.');
+        }
+
+        if ($stockTransfer->status !== 'pending') {
+            return back()->with('error', 'Hanya permintaan dengan status pending yang dapat ditolak.');
+        }
+
+        $stockTransfer->update(['status' => 'rejected']);
+
+        return redirect()->route('stock-transfers.index')->with('success', 'Permintaan transfer stok telah ditolak.');
     }
 
     /**

@@ -105,7 +105,7 @@
 <body>
     <div class="header">
         <h1>📦 LAPORAN PRODUK</h1>
-        <p><strong>Minimarket POS System</strong></p>
+        <p><strong>{{ auth()->user()->getActiveBranchName() }}</strong></p>
         <p>Dicetak pada: {{ now()->format('d M Y, H:i') }} WIB</p>
     </div>
 
@@ -153,14 +153,14 @@
                     <td>{{ $product->name }}</td>
                     <td>{{ $product->barcode }}</td>
                     <td>{{ $product->category->name ?? 'Tanpa Kategori' }}</td>
-                    <td class="text-center">{{ (float)$product->stock }}</td>
+                    <td class="text-center">{{ (float)$product->total_stock }}</td>
                     <td class="text-right">Rp {{ number_format($product->purchase_price, 0, ',', '.') }}</td>
                     <td class="text-right">Rp {{ number_format($product->selling_price, 0, ',', '.') }}</td>
-                    <td class="text-right">Rp {{ number_format($product->stock * $product->selling_price, 0, ',', '.') }}</td>
+                    <td class="text-right">Rp {{ number_format($product->total_stock * $product->selling_price, 0, ',', '.') }}</td>
                     <td class="text-center">
-                        @if($product->stock <= 0)
+                        @if($product->total_stock <= 0)
                             <span class="status-badge status-out">Habis</span>
-                        @elseif($product->stock <= $product->minimum_stock)
+                        @elseif($product->total_stock <= $product->minimum_stock)
                             <span class="status-badge status-low">Rendah</span>
                         @else
                             <span class="status-badge status-normal">Normal</span>

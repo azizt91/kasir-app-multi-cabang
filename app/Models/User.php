@@ -148,6 +148,20 @@ class User extends Authenticatable
     }
 
     /**
+     * Determine if this user is a Superadmin.
+     * Superadmin is defined as role=admin WITH branch_id=null (no branch assignment).
+     * A Branch Admin has role=admin but WITH a specific branch_id.
+     *
+     * @return bool
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'admin' && is_null($this->branch_id);
+    }
+
+
+
+    /**
      * Get the active warehouse for the user's branch.
      * Returns the first active warehouse of the user's branch.
      *
@@ -155,6 +169,16 @@ class User extends Authenticatable
      */
     public function getActiveWarehouse(): ?Warehouse
     {
+        if ($this->isSuperAdmin()) {
+            if (session('admin_active_branch_id')) {
+                return Warehouse::where('branch_id', session('admin_active_branch_id'))
+                    ->active()
+                    ->first();
+            }
+            // Superadmin is in Global View, return null to force manual selection in POS
+            return null;
+        }
+
         if (!$this->branch_id) {
             return Warehouse::active()->first();
         }
@@ -185,6 +209,30 @@ class User extends Authenticatable
     {
         return $query->where('role', 'kasir');
     }
+    /**
+     * Get the name of the currently active branch.
+     * - Superadmin (branch_id=null): returns session branch name or 'Semua Cabang'
+     * - Branch Admin & Kasir (branch_id set): always returns their own branch name
+     * 
+     * @return string
+     */
+    public function getActiveBranchName(): string
+    {
+        if (!$this->isSuperAdmin()) {
+            // Branch Admin & Kasir: always locked to their own branch
+            return $this->branch->name ?? 'N/A';
+        }
+        
+        // Superadmin: check session filter
+        $activeBranchId = session('admin_active_branch_id');
+        if (!$activeBranchId) {
+            return 'Semua Cabang';
+        }
+        
+        $branch = \App\Models\Branch::find($activeBranchId);
+        return $branch ? $branch->name : 'Semua Cabang';
+    }
+
     /**
      * Route notifications for the FCM channel.
      *

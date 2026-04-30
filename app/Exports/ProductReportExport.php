@@ -56,11 +56,11 @@ class ProductReportExport implements FromCollection, WithHeadings, WithMapping, 
             $product->barcode,
             $product->category->name ?? 'Tanpa Kategori',
             $product->description,
-            $product->stock,
+            $product->total_stock,
             $product->minimum_stock,
             $product->purchase_price,
             $product->selling_price,
-            $product->stock * $product->selling_price,
+            $product->total_stock * $product->selling_price,
             $stockStatus,
             $product->created_at->format('d/m/Y')
         ];

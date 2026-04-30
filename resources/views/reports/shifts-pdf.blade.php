@@ -17,6 +17,7 @@
 <body>
     <div class="header">
         <h2>LAPORAN SHIFT KASIR</h2>
+        <p><strong>{{ auth()->user()->getActiveBranchName() }}</strong></p>
         <p>{{ date('d/m/Y H:i') }}</p>
     </div>
 
